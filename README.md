@@ -5,17 +5,19 @@ A nostalgic iPod Classic-inspired Spotify player for the browser. It pairs a tac
 ## Features
 
 - Fully keyboard-accessible click wheel with menus, play/pause, and track skipping
-- A polished offline demo mode with a Now Playing screen and album art
+- A silent offline preview (demo mode does not stream audio)
 - Spotify sign-in with Authorization Code + PKCE — no client secret is stored in the app
-- Recently played tracks and artwork from the Spotify Web API
+- Recently played tracks, song search, and highest-resolution available album artwork
 - An in-browser Spotify Connect device via the Web Playback SDK
+- Play/pause, actual selected-track playback, skipping, seeking, and volume
+- Recoverable Spotify errors, refresh-token renewal, and rate-limit handling
 
 ## Run locally
 
 Serve the `dist/` directory with any static file server. For example:
 
 ```sh
-python3 -m http.server 4173 --directory dist
+python3 -m http.server 4173 --bind 127.0.0.1 --directory dist
 ```
 
 Open `http://127.0.0.1:4173/`.
@@ -29,6 +31,21 @@ Open `http://127.0.0.1:4173/`.
 
 Spotify's Web Playback SDK requires a Premium account. Development Mode apps also have Spotify-imposed user and endpoint limits.
 
+MENU goes back one screen; **Home menu** always returns to the main menu. Use the wheel, arrow keys, or clickable rows to browse. Center selects; the bottom wheel button or Space plays/pauses. Settings and long lists scroll inside the screen. Spotify playback state updates never replace a form you are typing in.
+
+The app registers a Spotify Connect device without taking over playback on startup. Selecting a song starts playback on this browser; some browsers require a second Play click to authorize audio. If protected playback is unsupported, try a supported Chrome browser. Spotify must allow the account and requested scopes; this app cannot bypass Premium or developer-access restrictions.
+
+Tokens stay in this browser's local storage and are never committed or sent to an app backend. Signing out clears this app's saved tokens. Do not use this on an untrusted shared browser.
+
+## Checks
+
+No dependency installation or build is required:
+
+```sh
+node --test tests/*.test.mjs
+node --check dist/app.js
+```
+
 ## Deploy to Vercel
 
 Set the project root to this repository, choose **Other** as the Framework Preset, leave the Build Command blank, and set Output Directory to `dist`.
@@ -41,5 +58,9 @@ After deployment, add the exact Vercel production URL as a Spotify Redirect URI.
 dist/
   index.html   # Interface shell
   style.css    # iPod-inspired visuals
-  app.js       # Click wheel, demo state, OAuth PKCE, Web API, Playback SDK
+  app.js       # Navigation, click wheel, playback UI and SDK lifecycle
+  core.mjs     # Track normalization, full-resolution artwork, queue helpers
+  spotify.mjs  # PKCE, session refresh, Web API, SDK loading
+tests/
+  player.test.mjs # Offline regression tests (no real credentials)
 ```

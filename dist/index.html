@@ -5,21 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#17191b" />
     <title>Pocket Spin — a Spotify player</title>
-    <link rel="stylesheet" href="./style.css" />
+    <meta name="description" content="A click-wheel Spotify player with recent listening, search, and clear album artwork." />
+    <link rel="stylesheet" href="./style.css?v=1.1" />
   </head>
   <body>
     <main class="stage">
       <section class="player" aria-label="Pocket Spin music player">
         <div class="topline"><span class="brand">Pocket Spin</span><span class="led" id="connectionDot"></span></div>
         <div class="screen-shell">
-          <div class="screen" id="screen" aria-live="polite"></div>
+          <div class="screen" id="screen"></div>
           <div class="screen-gloss"></div>
         </div>
         <div class="clickwheel" id="wheel" aria-label="Click wheel controls" tabindex="0">
           <button class="wheel-button menu-button" data-action="menu" aria-label="Menu">MENU</button>
-          <button class="wheel-button back-button" data-action="back" aria-label="Back">‹</button>
-          <button class="wheel-button next-button" data-action="next" aria-label="Next track">››</button>
-          <button class="wheel-button previous-button" data-action="previous" aria-label="Previous track">‹‹</button>
+          <button class="wheel-button previous-button" data-action="previous" aria-label="Previous track">◀◀</button>
+          <button class="wheel-button next-button" data-action="next" aria-label="Next track">▶▶</button>
+          <button class="wheel-button play-button" id="playButton" data-action="play" aria-label="Play">▶Ⅱ</button>
           <button class="select-button" data-action="select" aria-label="Select"><span></span></button>
         </div>
         <div class="speaker"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
@@ -28,10 +29,13 @@
         <p class="eyebrow">SPOTIFY WEB PLAYER</p>
         <h1>Your music,<br><em>with a spin.</em></h1>
         <p id="statusCopy">Demo mode is on. Set your Spotify Client ID in Settings to connect your own library.</p>
-        <div class="key-guide"><span>◌ scroll</span><span>center select</span><span>MENU home</span></div>
+        <div class="key-guide"><span>◌ scroll</span><span>center select</span><span>MENU back</span><span>space play / pause</span></div>
+        <button class="home-button" data-action="home">Home menu</button>
+        <div class="error-box" id="errorBox" role="alert" hidden><p id="errorText"></p><button data-action="dismiss">Dismiss</button></div>
+        <p class="version">Reliability edition · 1.1</p>
       </aside>
     </main>
-    <div class="toast" id="toast"></div>
-    <script src="./app.js"></script>
+    <div class="toast" id="toast" role="status"></div>
+    <script type="module" src="./app.js?v=1.1"></script>
   </body>
 </html>
