@@ -2,13 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#17191b" />
     <title>Pocket Spin — a Spotify player</title>
     <meta name="description" content="A click-wheel Spotify player with recent listening, search, and clear album artwork." />
-    <link rel="stylesheet" href="./style.css?v=1.1" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="stylesheet" href="./style.css?v=1.2" />
   </head>
   <body>
+    <nav class="view-controls" aria-label="Player view">
+      <button id="layoutButton" type="button" hidden>Show page</button>
+      <button id="fullscreenButton" type="button" aria-pressed="false">Fullscreen</button>
+    </nav>
     <main class="stage">
       <section class="player" aria-label="Pocket Spin music player">
         <div class="topline"><span class="brand">Pocket Spin</span><span class="led" id="connectionDot"></span></div>
@@ -31,11 +36,11 @@
         <p id="statusCopy">Demo mode is on. Set your Spotify Client ID in Settings to connect your own library.</p>
         <div class="key-guide"><span>◌ scroll</span><span>center select</span><span>MENU back</span><span>space play / pause</span></div>
         <button class="home-button" data-action="home">Home menu</button>
-        <div class="error-box" id="errorBox" role="alert" hidden><p id="errorText"></p><button data-action="dismiss">Dismiss</button></div>
-        <p class="version">Reliability edition · 1.1</p>
+        <p class="version">Fullscreen edition · 1.2</p>
       </aside>
     </main>
+    <div class="error-box" id="errorBox" role="alert" hidden><p id="errorText"></p><button data-action="dismiss">Dismiss</button></div>
     <div class="toast" id="toast" role="status"></div>
-    <script type="module" src="./app.js?v=1.1"></script>
+    <script type="module" src="./app.js?v=1.2"></script>
   </body>
 </html>

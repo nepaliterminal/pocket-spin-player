@@ -11,6 +11,16 @@ A nostalgic iPod Classic-inspired Spotify player for the browser. It pairs a tac
 - An in-browser Spotify Connect device via the Web Playback SDK
 - Play/pause, actual selected-track playback, skipping, seeking, and volume
 - Recoverable Spotify errors, refresh-token renewal, and rate-limit handling
+- Fullscreen/player-only view that scales the entire iPod to fit the viewport
+- A small installable Android companion APK using Chrome Custom Tabs
+
+## Fullscreen and Android
+
+Click **Fullscreen** at the top right. The side panel disappears and the whole player fits the display. Use **Exit fullscreen** or Escape to return. Browsers that deny fullscreen fall back to a player-only layout with a **Show page** exit. The Android companion starts in this layout and needs a tap on Fullscreen to hide browser controls.
+
+See [Android build and installation](android/README.md). The APK uses the same private hosted Site and Spotify settings. It is test-signed for sideloading, not a Play Store release. It requires a compatible browser, internet, and the existing Site/Spotify permissions; it does not bundle a native or offline music engine.
+
+References: [Spotify browser support](https://developer.spotify.com/documentation/web-playback-sdk), [Android Custom Tabs](https://developer.android.com/reference/androidx/browser/customtabs/CustomTabsIntent).
 
 ## Run locally
 
@@ -61,6 +71,8 @@ dist/
   app.js       # Navigation, click wheel, playback UI and SDK lifecycle
   core.mjs     # Track normalization, full-resolution artwork, queue helpers
   spotify.mjs  # PKCE, session refresh, Web API, SDK loading
+  fullscreen.mjs # Fullscreen API and responsive player-only mode
 tests/
   player.test.mjs # Offline regression tests (no real credentials)
+android/       # Dependency-free Android companion source/build script
 ```

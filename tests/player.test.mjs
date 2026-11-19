@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { artwork, uniqueTracks, playbackBody, escapeHtml, formatTime, angleDelta, readJson } from '../dist/core.mjs';
 import { SpotifyClient } from '../dist/spotify.mjs';
+import { playerScale } from '../dist/fullscreen.mjs';
 
 const memory = (data={}) => ({getItem:key=>data[key]??null,setItem:(key,value)=>{data[key]=value;},removeItem:key=>{delete data[key];}});
 const token = {access_token:'test-access',refresh_token:'test-refresh',expires_at:9999999};
@@ -11,6 +12,15 @@ const clientFor = (request, saved=token) => new SpotifyClient({storage:memory({
   'pocket-spin-token-v1':JSON.stringify(saved)
 }),session:memory(),request,now:()=>1000});
 const rawTrack = (id, images=[]) => ({name:id,uri:'spotify:track:'+id,artists:[{name:'Artist'}],album:{name:'Album',images},duration_ms:100000});
+
+test('fullscreen player fits portrait, landscape, and desktop viewports',()=>{
+  for(const [width,height] of [[320,568],[360,640],[393,852],[844,390],[1920,1080]]) {
+    const scale=playerScale(width,height);
+    assert.ok(scale*360 <= width-24);
+    assert.ok(scale*710 <= height-90);
+    assert.ok(scale<=1.6);
+  }
+});
 
 test('artwork chooses full resolution regardless of API array order',()=>{
   const images=[{width:64,url:'https://images.test/small'},{width:640,url:'https://images.test/large'},{width:300,url:'https://images.test/medium'}];

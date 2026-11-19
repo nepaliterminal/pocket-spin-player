@@ -1,6 +1,7 @@
 /* Pocket Spin: browser-only PKCE. Never put a client secret in this app. */
 import { clamp, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, formatTime, angleDelta } from './core.mjs';
 import { SpotifyClient, loadSdk } from './spotify.mjs';
+import { installFullscreen } from './fullscreen.mjs';
 
 const $ = selector => document.querySelector(selector);
 const screen = $('#screen');
@@ -257,4 +258,5 @@ async function boot() {
   render();
   if(!demo()){run(loadLibrary);run(connectPlayer);}
 }
+installFullscreen(notify);
 boot().catch(report);
