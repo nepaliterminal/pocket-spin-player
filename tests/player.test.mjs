@@ -297,3 +297,8 @@ test('a missing Spotify device is reported with status 404 so the app can find t
   const client=clientFor(async()=>response(404,{}));
   await assert.rejects(client.api('/me/player/next',{method:'POST'}),error=>error.status===404);
 });
+test('remote playback reports Spotify shuffle and repeat like the SDK',()=>{
+  const state=remoteState({is_playing:true,item:{duration_ms:1},shuffle_state:true,repeat_state:'track'});
+  assert.equal(state.shuffle,true);assert.equal(state.repeat_mode,2);
+  assert.equal(remoteState({item:{},repeat_state:'off'}).repeat_mode,0);
+});

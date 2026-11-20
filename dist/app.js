@@ -1,5 +1,5 @@
 /* Pocket Spin: browser-only PKCE. Never put a client secret in this app. */
-import { clamp, setPageCursor, clampPageCursor, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta } from './core.mjs';
+import { clamp, setPageCursor, clampPageCursor, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta, repeatModes } from './core.mjs';
 import { SpotifyClient, loadSdk, remotePlayer } from './spotify.mjs';
 import { installFullscreen } from './fullscreen.mjs';
 
@@ -12,11 +12,11 @@ const demoTracks = [
   {name:'Slow Motion', artist:'Garden Club', album:'Lemon Season', duration:196000}
 ];
 const menuItems = [
-  ['Now Playing','now'], ['Recently Played','library'], ['Playlists','playlists'], ['Search Songs','search'],
+  ['Now Playing','now'], ['Recently Played','library'], ['Playlists','playlists'], ['Search Songs','search'], ['Shuffle','shuffle'], ['Repeat','repeat'],
   ['Spotify Setup','settings'], ['Help','help']
 ];
 const state = {
-  page:'home', cursor:0, stack:[], track:null, playing:false, position:0, updated:performance.now(),
+  page:'home', cursor:0, shuffle:false, repeat:0, stack:[], track:null, playing:false, position:0, updated:performance.now(),
   player:null, deviceId:null, active:false, connecting:null, busy:false, epoch:0,
   library:[], loading:false, libraryError:'', results:[], query:'', searched:false, searching:false,
   playlists:[], playlistsLoaded:false, playlistsLoading:false, playlistsError:'', playlist:null,
@@ -70,9 +70,10 @@ const helpTopics=[
   ['MENU','Press MENU at the top of the wheel to go back one screen. The phone’s Back button does the same.'],
   ['Play and skip','▶Ⅱ at the bottom plays or pauses. ▶▶ skips to the next song and ◀◀ goes back one.'],
   ['Get your music','Go to Spotify Setup and press the center button to sign in. Playing needs Spotify Premium, and the music plays through the Spotify app on this phone.'],
+  ['Shuffle and Repeat','In the Music menu, highlight Shuffle and press the center button to switch between Off and Songs. Repeat cycles Off, All (the whole list) and One (this song). A song must be playing first.'],
   ['Find songs','Recently Played lists your latest songs, and Playlists has your playlists. In Search Songs, tap the box, type, then press Find.']
 ];
-const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.4</p></div>';
+const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.5</p></div>';
 function render() {
   if(state.page==='now') screen.innerHTML=nowView();
   else if(state.page==='library') screen.innerHTML=libraryView();
@@ -81,10 +82,10 @@ function render() {
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
   else if(state.page==='help') screen.innerHTML=helpView();
-  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.4</p></div>';
-  else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+'</button>').join('')+'</div>';
+  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.5</p></div>';
+  else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+(page==='shuffle'?'<span>'+(state.shuffle?'Songs':'Off')+'</span>':page==='repeat'?'<span>'+['Off','All','One'][state.repeat]+'</span>':'')+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
-  if(['library','search','playlists','playlist'].includes(state.page)) {
+  if(['home','library','search','playlists','playlist'].includes(state.page)) {
     const selected=screen.querySelector('.selected');
     if(selected) selected.scrollIntoView({block:'nearest'});
   }
@@ -126,7 +127,7 @@ function go(page) {
 function back() { Object.assign(state,state.stack.pop()||{page:'home',cursor:0}); clampPageCursor(state,items().length); render(); }
 function home() { state.page='home';state.cursor=0;state.stack=[];render(); }
 function select() {
-  if(state.page==='home') return go(menuItems[state.cursor][1]);
+  if(state.page==='home') {const page=menuItems[state.cursor][1];return page==='shuffle'?toggleShuffle():page==='repeat'?cycleRepeat():go(page);}
   if(state.page==='search'&&demo()) return go('settings');
   if(state.page==='library'||state.page==='search') return playTrack(items()[state.cursor],items());
   if(state.page==='playlists') {
@@ -142,6 +143,8 @@ function applyPlayback(playback) {
   const track=trackFrom(playback.track_window?.current_track); if(!track) return;
   track.duration=playback.duration||track.duration;
   const changed=track.uri!==state.track?.uri || track.image!==state.track?.image;
+  if(playback.shuffle!==undefined)state.shuffle=!!playback.shuffle;
+  if(playback.repeat_mode!==undefined)state.repeat=playback.repeat_mode;
   state.track=track;state.position=playback.position;state.updated=performance.now();state.playing=!playback.paused;state.active=true;
   if(changed&&state.page==='now') render(); else {updateStatus();updateProgress();}
 }
@@ -273,6 +276,20 @@ async function togglePlay() {
   finally {state.busy=false;updateProgress();}
   settle();
 }
+// Shuffle and Repeat use Spotify's own modes, so they also apply in the Spotify app.
+async function setMode(update,path) {
+  if(state.busy) return;
+  if(!demo()) {
+    await readyForPlayback();
+    if(!state.active) throw new Error('Play a song first, then set Shuffle or Repeat.');
+    state.busy=true;
+    try {await withDevice(()=>client.api(path()+'&device_id='+encodeURIComponent(state.player?.target?.()||state.deviceId),{method:'PUT'}));}
+    finally {state.busy=false;}
+  }
+  update();render();
+}
+const toggleShuffle=()=>setMode(()=>{state.shuffle=!state.shuffle;},()=>'/me/player/shuffle?state='+!state.shuffle);
+const cycleRepeat=()=>setMode(()=>{state.repeat=(state.repeat+1)%3;},()=>'/me/player/repeat?state='+repeatModes[(state.repeat+1)%3]);
 async function skip(direction) {
   if(state.busy) return;
   if(demo()) {const index=Math.max(0,demoTracks.indexOf(state.track));state.track=demoTracks[(index+direction+demoTracks.length)%demoTracks.length];state.position=0;state.updated=performance.now();if(state.page==='now')render();return;}
