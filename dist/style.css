@@ -90,3 +90,5 @@ button:disabled { opacity:.55; cursor:wait; }
 .player-mode .player { position:absolute;left:50%;top:calc(50% + 24px);width:360px;height:710px;padding:22px 24px 18px;margin:0;transform:translate(-50%,-50%) scale(var(--player-scale,1));transform-origin:center; }
 .player-mode .toast { bottom:max(12px,env(safe-area-inset-bottom)); }
 :fullscreen { background:#101315; }
+.native-app .view-controls { display:none; }
+.native-app.player-mode .player { top:50%; }

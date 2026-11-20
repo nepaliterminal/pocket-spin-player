@@ -59,3 +59,12 @@ export function formatTime(ms) {
 export function angleDelta(from, to) {
   return ((to - from + 540) % 360) - 180;
 }
+export function pickDevice(devices = [], skipName = 'Pocket Spin') {
+  const usable = (devices || []).filter(d => d?.id && !d.is_restricted && d.name !== skipName);
+  return usable.find(d => d.is_active) || usable.find(d => d.type === 'Smartphone') || usable[0] || null;
+}
+export function remoteState(playback) {
+  if (!playback?.item) return null;
+  return {paused:!playback.is_playing, position:playback.progress_ms || 0, duration:playback.item.duration_ms || 0,
+    track_window:{current_track:playback.item}};
+}

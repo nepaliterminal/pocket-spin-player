@@ -19,10 +19,12 @@ test -f "$android_jar" || { echo "Missing compile platform: $android_jar"; exit 
 case "$output_apk" in /*) ;; *) echo 'OUTPUT_APK must be an absolute path'; exit 2;; esac
 mkdir -p "$scratch_parent" "$(dirname "$output_apk")"
 build_dir="$(mktemp -d "$scratch_parent/pocket-spin.XXXXXX")"
-mkdir -p "$build_dir/classes" "$build_dir/dex"
+mkdir -p "$build_dir/classes" "$build_dir/dex" "$build_dir/assets"
+# The player UI ships inside the APK; the app never loads it from the web.
+cp -R "$source_root/../dist" "$build_dir/assets/www"
 "$build_tools/aapt2" compile --dir "$source_root/res" -o "$build_dir/resources.zip"
-"$build_tools/aapt2" link -o "$build_dir/unsigned.apk" --manifest "$source_root/AndroidManifest.xml" -I "$android_jar" "$build_dir/resources.zip"
-"$jdk_root/bin/javac" --release 8 -classpath "$android_jar" -d "$build_dir/classes" "$source_root/src/io/github/nepaliterminal/pocketspin/MainActivity.java"
+"$build_tools/aapt2" link -o "$build_dir/unsigned.apk" --manifest "$source_root/AndroidManifest.xml" -I "$android_jar" -A "$build_dir/assets" "$build_dir/resources.zip"
+"$jdk_root/bin/javac" --release 8 -classpath "$android_jar" -d "$build_dir/classes" "$source_root"/src/io/github/nepaliterminal/pocketspin/*.java
 "$jdk_root/bin/jar" --create --file "$build_dir/classes.jar" -C "$build_dir/classes" .
 "$jdk_root/bin/java" -cp "$build_tools/lib/d8.jar" com.android.tools.r8.D8 --release --min-api 24 --lib "$android_jar" --output "$build_dir/dex" "$build_dir/classes.jar"
 (cd "$build_dir/dex" && zip -q -j "$build_dir/unsigned.apk" classes.dex)

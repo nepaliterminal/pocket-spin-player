@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { artwork, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson, clamp, setPageCursor, clampPageCursor } from '../dist/core.mjs';
-import { SpotifyClient, DEFAULT_CLIENT_ID } from '../dist/spotify.mjs';
+import { artwork, pickDevice, remoteState, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson, clamp, setPageCursor, clampPageCursor } from '../dist/core.mjs';
+import { SpotifyClient, DEFAULT_CLIENT_ID, remotePlayer } from '../dist/spotify.mjs';
 import { playerScale } from '../dist/fullscreen.mjs';
 
 const memory = (data={}) => ({getItem:key=>data[key]??null,setItem:(key,value)=>{data[key]=value;},removeItem:key=>{delete data[key];}});
@@ -239,4 +239,34 @@ test('client ID defaults to the built-in app but a saved ID overrides it',()=>{
   assert.equal(new SpotifyClient({storage:memory(),session:memory()}).config.clientId,DEFAULT_CLIENT_ID);
   assert.match(DEFAULT_CLIENT_ID,/^[a-f\d]{32}$/);
   assert.equal(clientFor(()=>{}).config.clientId,'a'.repeat(32));
+});
+test('remote device choice prefers the active device, then a phone, never the in-app player',()=>{
+  assert.equal(pickDevice([{id:'a',name:'Pocket Spin',is_active:true},{id:'b',type:'Computer'},{id:'c',type:'Smartphone'}]).id,'c');
+  assert.equal(pickDevice([{id:'b',type:'Computer',is_active:true},{id:'c',type:'Smartphone'}]).id,'b');
+  assert.equal(pickDevice([{id:'r',type:'Smartphone',is_restricted:true},{id:null}]),null);
+  assert.equal(pickDevice(undefined),null);
+});
+test('remote playback state maps to the in-app player shape',()=>{
+  assert.equal(remoteState(null),null);
+  assert.equal(remoteState({is_playing:true}),null);
+  const state=remoteState({is_playing:false,progress_ms:5000,item:rawTrack('x')});
+  assert.deepEqual([state.paused,state.position,state.duration,state.track_window.current_track.name],[true,5000,100000,'x']);
+});
+test('remote player controls the chosen Spotify device through the Web API',async()=>{
+  const calls=[],playback={is_playing:true,progress_ms:1,item:rawTrack('x')};
+  const client=clientFor(async(url,options)=>{
+    calls.push((options.method||'GET')+' '+url.replace('https://api.spotify.com/v1',''));
+    if(url.endsWith('/me/player/devices')) return response(200,{devices:[{id:'phone 1',name:'Pixel',type:'Smartphone'}]});
+    if(url.endsWith('/me/player')) return response(200,playback);
+    return response(204);
+  });
+  const remote=await remotePlayer(client);
+  assert.equal(remote.deviceId,'phone 1');
+  await remote.togglePlay();await remote.nextTrack();await remote.seek(1500.4);
+  assert.deepEqual(calls.slice(1),['GET /me/player','PUT /me/player/pause?device_id=phone%201','POST /me/player/next?device_id=phone%201','PUT /me/player/seek?position_ms=1500&device_id=phone%201']);
+  playback.device={id:'tv 2'};calls.length=0;
+  await remote.getCurrentState();await remote.nextTrack();
+  assert.deepEqual(calls,['GET /me/player','POST /me/player/next?device_id=tv%202']);
+  const none=clientFor(async()=>response(200,{devices:[]}));
+  assert.equal(await remotePlayer(none),null);
 });
