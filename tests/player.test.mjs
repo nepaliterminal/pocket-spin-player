@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { artwork, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson } from '../dist/core.mjs';
+import { artwork, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson, clamp, setPageCursor, clampPageCursor } from '../dist/core.mjs';
 import { SpotifyClient, DEFAULT_CLIENT_ID } from '../dist/spotify.mjs';
 import { playerScale } from '../dist/fullscreen.mjs';
 
@@ -12,6 +12,54 @@ const clientFor = (request, saved=token) => new SpotifyClient({storage:memory({
   'pocket-spin-token-v1':JSON.stringify(saved)
 }),session:memory(),request,now:()=>1000});
 const rawTrack = (id, images=[]) => ({name:id,uri:'spotify:track:'+id,artists:[{name:'Artist'}],album:{name:'Album',images},duration_ms:100000});
+
+test('restored page cursor stays within a changed or empty list',()=>{
+  for(const [cursor,length,expected] of [[4,2,1],[4,0,0],[1,3,1],[-1,3,0]]) {
+    const state={page:'library',cursor};
+    clampPageCursor(state,length);
+    assert.equal(state.cursor,expected);
+    assert.equal(state.page,'library');
+  }
+});
+test('library and playlist completion only clamps the cursor on its own page',async()=>{
+  for(const owner of ['library','playlists','playlist']) {
+    for(const length of [0,2,10]) {
+      for(const page of ['library','playlists','playlist','home','search','settings','now','about']) {
+        const state={page:owner,cursor:4};
+        let complete;
+        const pending=new Promise(resolve=>{complete=resolve;}).finally(()=>{
+          setPageCursor(state,owner,clamp(state.cursor,0,Math.max(0,length-1)));
+        });
+        state.page=page;
+        complete();await pending;
+        assert.equal(state.cursor,page===owner?Math.min(4,Math.max(0,length-1)):4);
+      }
+    }
+  }
+});
+test('failed library completion preserves another page cursor',async()=>{
+  const state={page:'home',cursor:4};
+  await assert.rejects(Promise.reject(new Error('offline')).finally(()=>{
+    setPageCursor(state,'library',0);
+  }),/offline/);
+  assert.equal(state.cursor,4);
+});
+test('search completion only resets the cursor while viewing search',async()=>{
+  for(const results of [[],[rawTrack('one')]]) {
+    for(const page of ['search','home','library','playlists','playlist','settings','now','about']) {
+      const state={page:'search',cursor:4,results:[]};
+      let complete;
+      const pending=new Promise(resolve=>{complete=resolve;}).then(data=>{
+        state.results=uniqueTracks(data);
+        setPageCursor(state,'search',0);
+      });
+      state.page=page;
+      complete(results);await pending;
+      assert.equal(state.cursor,page==='search'?0:4);
+      assert.equal(state.results.length,results.length);
+    }
+  }
+});
 
 test('fullscreen player fits portrait, landscape, and desktop viewports',()=>{
   for(const [width,height] of [[320,568],[360,640],[393,852],[844,390],[1920,1080]]) {

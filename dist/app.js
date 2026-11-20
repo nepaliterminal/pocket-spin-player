@@ -1,5 +1,5 @@
 /* Pocket Spin: browser-only PKCE. Never put a client secret in this app. */
-import { clamp, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta } from './core.mjs';
+import { clamp, setPageCursor, clampPageCursor, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta } from './core.mjs';
 import { SpotifyClient, loadSdk } from './spotify.mjs';
 import { installFullscreen } from './fullscreen.mjs';
 
@@ -104,7 +104,7 @@ function go(page) {
   render();
   if(page==='playlists'&&!state.playlistsLoaded&&!state.playlistsLoading) run(loadPlaylists);
 }
-function back() { Object.assign(state,state.stack.pop()||{page:'home',cursor:0}); render(); }
+function back() { Object.assign(state,state.stack.pop()||{page:'home',cursor:0}); clampPageCursor(state,items().length); render(); }
 function home() { state.page='home';state.cursor=0;state.stack=[];render(); }
 function select() {
   if(state.page==='home') return go(menuItems[state.cursor][1]);
@@ -204,14 +204,14 @@ async function loadLibrary() {
   if(state.page==='library')render();
   try {const data=await client.api('/me/player/recently-played?limit=20');if(epoch===state.epoch)state.library=uniqueTracks(data.items);}
   catch(error){if(epoch===state.epoch)state.libraryError=error.message;}
-  finally {if(epoch===state.epoch){state.loading=false;state.cursor=clamp(state.cursor,0,Math.max(0,state.library.length-1));if(state.page==='library')render();}}
+  finally {if(epoch===state.epoch){state.loading=false;setPageCursor(state,'library',clamp(state.cursor,0,Math.max(0,state.library.length-1)));if(state.page==='library')render();}}
 }
 async function search() {
   if(demo()) throw new Error('Connect Spotify from Setup to search.');
   state.query=$('#searchInput').value.trim();if(!state.query)return;
   const id=++searchId, epoch=state.epoch;
   state.searching=true;state.searched=false;state.results=[];render();
-  try {const data=await client.api('/search?type=track&limit=10&q='+encodeURIComponent(state.query));if(id===searchId&&epoch===state.epoch){state.results=uniqueTracks(data.tracks?.items);state.searched=true;state.cursor=0;}}
+  try {const data=await client.api('/search?type=track&limit=10&q='+encodeURIComponent(state.query));if(id===searchId&&epoch===state.epoch){state.results=uniqueTracks(data.tracks?.items);state.searched=true;setPageCursor(state,'search',0);}}
   finally {if(id===searchId&&epoch===state.epoch){state.searching=false;if(state.page==='search')render();}}
 }
 async function playlistPages(path, limit) {
@@ -229,7 +229,7 @@ async function loadPlaylists() {
     const playlists=demo()?[{id:'demo',name:'Pocket Spin Mix',owner:'Pocket Spin',uri:'',total:demoTracks.length}]: (await playlistPages('/me/playlists?limit=50',200)).map(playlistFrom).filter(Boolean);
     if(epoch===state.epoch){state.playlists=playlists;state.playlistsLoaded=true;}
   } catch(error){if(epoch===state.epoch)state.playlistsError=error.message;}
-  finally {if(epoch===state.epoch){state.playlistsLoading=false;if(state.page==='playlists'){state.cursor=clamp(state.cursor,0,Math.max(0,state.playlists.length-1));render();}}}
+  finally {if(epoch===state.epoch){state.playlistsLoading=false;setPageCursor(state,'playlists',clamp(state.cursor,0,Math.max(0,state.playlists.length-1)));if(state.page==='playlists')render();}}
 }
 async function loadPlaylist() {
   const epoch=state.epoch, id=++state.playlistRequest, playlist=state.playlist;
@@ -247,7 +247,7 @@ async function loadPlaylist() {
     }
     if(epoch===state.epoch&&id===state.playlistRequest)state.playlistTracks=tracks;
   }catch(error){if(epoch===state.epoch&&id===state.playlistRequest)state.playlistError=error.message;}
-  finally {if(epoch===state.epoch&&id===state.playlistRequest){state.playlistLoading=false;if(state.page==='playlist'){state.cursor=clamp(state.cursor,0,Math.max(0,state.playlistTracks.length-1));render();}}}
+  finally {if(epoch===state.epoch&&id===state.playlistRequest){state.playlistLoading=false;setPageCursor(state,'playlist',clamp(state.cursor,0,Math.max(0,state.playlistTracks.length-1)));if(state.page==='playlist')render();}}
 }
 function signout() {
   Object.assign(state,{playlists:[],playlistsLoaded:false,playlistsLoading:false,playlistsError:'',playlist:null,playlistTracks:[],playlistLoading:false,playlistError:''});
