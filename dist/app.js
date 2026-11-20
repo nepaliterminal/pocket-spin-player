@@ -1,6 +1,6 @@
 /* Pocket Spin: browser-only PKCE. Never put a client secret in this app. */
 import { clamp, setPageCursor, clampPageCursor, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta } from './core.mjs';
-import { SpotifyClient, loadSdk } from './spotify.mjs';
+import { SpotifyClient, loadSdk, remotePlayer } from './spotify.mjs';
 import { installFullscreen } from './fullscreen.mjs';
 
 const $ = selector => document.querySelector(selector);
@@ -23,7 +23,10 @@ const state = {
   playlistTracks:[], playlistLoading:false, playlistError:'', playlistRequest:0,
   error:'', playerError:'', volume:clamp(readJson(localStorage,'pocket-spin-volume',0.6),0,1)
 };
-let searchId = 0;
+let searchId = 0, sdkFailed = false;
+const android = window.PocketSpinAndroid;
+const nativeApp = !!android?.isApp?.();
+document.body?.classList.toggle('native-app', nativeApp);
 const demo = () => !client.token;
 const redirect = () => location.origin + location.pathname;
 const position = () => clamp(state.position + (state.playing ? performance.now()-state.updated : 0),0,state.track?.duration || 0);
@@ -54,6 +57,7 @@ function playlistView() {
   return topbar(state.playlist?.name || 'Playlist')+'<div class="screen-scroll">'+(state.playlistLoading?'<p class="empty">Loading songs…</p>':state.playlistError?'<p class="empty">'+esc(state.playlistError)+'</p>'+button('Try again','refreshPlaylist'):state.playlistTracks.length?trackRows(state.playlistTracks):'<p class="empty">No playable songs in this playlist.</p>')+'</div>';
 }
 function settingsView() {
+  if(nativeApp) return topbar('Spotify Setup')+'<div class="screen-scroll connect"><p>'+(demo()?'Sign in with your Spotify account to play your music.':'Signed in to Spotify.')+'</p><form id="loginForm"><input type="hidden" id="clientId" value="'+esc(client.config.clientId||'')+'"><button class="screen-action" type="submit">'+(demo()?'Sign in with Spotify':'Sign in again')+'</button></form>'+(demo()?'':button('Reconnect audio player','reconnect')+button('Sign out','signout'))+'<label for="volume">Volume</label><input id="volume" aria-label="Volume" type="range" min="0" max="100" value="'+Math.round(state.volume*100)+'"><p class="legal">Spotify Premium is required to play music. If sound cannot start inside Pocket Spin, it plays through the Spotify app on this phone.</p></div>';
   return topbar('Spotify Setup')+'<div class="screen-scroll connect"><p>Use your Spotify app’s Client ID. Never enter a client secret.</p><form id="loginForm"><label for="clientId">Client ID</label><input class="field" id="clientId" value="'+esc(client.config.clientId||'')+'" placeholder="32-character Client ID" autocomplete="off" spellcheck="false" required><label for="redirect">Redirect URL (exact match)</label><input class="field" id="redirect" readonly value="'+esc(redirect())+'"><button class="screen-action" type="submit">'+(demo()?'Sign in with Spotify':'Sign in again')+'</button></form>'+(demo()?'':button('Reconnect audio player','reconnect')+button('Sign out on this browser','signout'))+'<label for="volume">Volume</label><input id="volume" aria-label="Volume" type="range" min="0" max="100" value="'+Math.round(state.volume*100)+'"><p class="legal">Browser playback requires Spotify Premium. Development apps must allow your account in their dashboard. Select Web API and Web Playback SDK. Allow protected-content playback in your browser.</p></div>';
 }
 function render() {
@@ -63,7 +67,7 @@ function render() {
   else if(state.page==='playlist') screen.innerHTML=playlistView();
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
-  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Fullscreen edition · 1.2</p></div>';
+  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.0</p></div>';
   else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
   if(['library','search','playlists','playlist'].includes(state.page)) {
@@ -142,6 +146,7 @@ async function connectPlayer() {
   const epoch=state.epoch;
   const task=(async()=>{
     state.playerError='';updateStatus();
+    if(sdkFailed) {if(await connectRemote(epoch))return;throw new Error(remoteHint());}
     await client.accessToken();const sdk=await loadSdk();
     if(epoch!==state.epoch) return;
     const player=new sdk.Player({name:'Pocket Spin',volume:state.volume,getOAuthToken:cb=>client.accessToken().then(cb).catch(report)});
@@ -162,14 +167,37 @@ async function connectPlayer() {
     });
   })();
   state.connecting=task;
-  try {await task;} catch(error) {if(epoch!==state.epoch)return;state.player?.disconnect();state.player=null;state.deviceId=null;state.playerError=error.message;updateStatus();throw error;}
+  try {await task;} catch(error) {
+    if(epoch!==state.epoch)return;
+    const fromSdk=!sdkFailed&&!state.player?.remote;
+    state.player?.disconnect();state.player=null;state.deviceId=null;
+    if(fromSdk) {sdkFailed=true;if(await connectRemote(epoch).catch(()=>false))return;}
+    state.playerError=error.message;updateStatus();throw error;
+  }
   finally {if(state.connecting===task)state.connecting=null;}
 }
+async function connectRemote(epoch) {
+  const remote=await remotePlayer(client);
+  if(!remote||epoch!==state.epoch) return false;
+  state.player=remote;state.deviceId=remote.deviceId;state.playerError='';state.error='';
+  notify('Playing through Spotify on '+remote.name+'.');updateStatus();
+  return true;
+}
+const remoteHint=()=>nativeApp?'Open the Spotify app on this phone, then press Play in Pocket Spin.':'Open Spotify on any device, then press Play here.';
 async function readyForPlayback() {
   // Activate synchronously inside the user's gesture, before any network wait.
   const activation=state.player?.activateElement?.();
   if(activation) await activation;
-  if(!state.deviceId) {await connectPlayer();throw new Error('Audio player is ready. Press Play once more to start.');}
+  if(state.deviceId) return;
+  try {await connectPlayer();}
+  catch(error) {
+    if(nativeApp&&sdkFailed&&!state.deviceId) {
+      const installed=android.hasSpotifyApp();android.openSpotify();
+      throw new Error(installed?'Spotify opened so it can play your music. Come back to Pocket Spin and press Play again.':'Install the Spotify app to play music, then press Play again.');
+    }
+    throw error;
+  }
+  if(!state.player?.remote) throw new Error('Audio player is ready. Press Play once more to start.');
 }
 async function playTrack(track,queue=[],playlist=null) {
   if(!track||state.busy) return;
@@ -263,7 +291,7 @@ function signout() { client.logout(); }
 const actions={menu:back,back,home,select,play:togglePlay,next:()=>skip(1),previous:()=>skip(-1),
   library:()=>go('library'),refresh:loadLibrary,dismiss:()=>{state.error='';updateStatus();},
   refreshPlaylists:loadPlaylists,refreshPlaylist:loadPlaylist,
-  reconnect:()=>{disconnect();return connectPlayer();},signout};
+  reconnect:()=>{disconnect();sdkFailed=false;return connectPlayer();},signout};
 // Direct click handlers preserve browser user activation for protected audio.
 document.addEventListener('click',event=>{
   const target=event.target.closest('button');if(!target)return;
@@ -316,8 +344,15 @@ async function boot() {
   render();
   try {await client.callback(location.search);}catch(error){state.page='settings';report(error);}
   finally {const query=new URLSearchParams(location.search);if(query.has('code')||query.has('error'))history.replaceState({},'',redirect());}
+  if(nativeApp&&demo()&&state.page==='home') go('settings');
   render();
   if(!demo()){run(loadLibrary);run(connectPlayer);}
 }
+// Android Back: returns true when the player handled it, false to leave the app.
+window.pocketSpinBack=()=>{
+  if(state.error){state.error='';updateStatus();return true;}
+  if(state.page==='home'&&!state.stack.length) return false;
+  back();return true;
+};
 installFullscreen(notify);
 boot().catch(report);

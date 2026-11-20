@@ -12,15 +12,15 @@ A nostalgic iPod Classic-inspired Spotify player for the browser. It pairs a tac
 - Play/pause, actual selected-track playback, skipping, seeking, and volume
 - Recoverable Spotify errors, refresh-token renewal, and rate-limit handling
 - Fullscreen/player-only view that scales the entire iPod to fit the viewport
-- A small installable Android companion APK using Chrome Custom Tabs
+- An Android APK that is the iPod player itself, with Spotify sign-in inside the app
 
 ## Fullscreen and Android
 
-Click **Fullscreen** at the top right. The side panel disappears and the whole player fits the display. Use **Exit fullscreen** or Escape to return. Browsers that deny fullscreen fall back to a player-only layout with a **Show page** exit. The Android companion starts in this layout and needs a tap on Fullscreen to hide browser controls.
+Click **Fullscreen** at the top right. The side panel disappears and the whole player fits the display. Use **Exit fullscreen** or Escape to return. Browsers that deny fullscreen fall back to a player-only layout with a **Show page** exit. The Android app always starts in this layout, full screen.
 
-See [Android build and installation](android/README.md). The APK uses the same private hosted Site and Spotify settings. It is test-signed for sideloading, not a Play Store release. It requires a compatible browser, internet, and the existing Site/Spotify permissions; it does not bundle a native or offline music engine.
+See [Android build and installation](android/README.md). The APK bundles this UI, signs in to Spotify inside the app, and plays in-app or through the phone's Spotify app. It is test-signed for sideloading, not a Play Store release.
 
-References: [Spotify browser support](https://developer.spotify.com/documentation/web-playback-sdk), [Android Custom Tabs](https://developer.android.com/reference/androidx/browser/customtabs/CustomTabsIntent).
+References: [Spotify Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk), [Android WebView](https://developer.android.com/reference/android/webkit/WebView).
 
 ## Run locally
 
@@ -76,5 +76,5 @@ dist/
   fullscreen.mjs # Fullscreen API and responsive player-only mode
 tests/
   player.test.mjs # Offline regression tests (no real credentials)
-android/       # Dependency-free Android companion source/build script
+android/       # Dependency-free Android app (bundles dist/) and build script
 ```

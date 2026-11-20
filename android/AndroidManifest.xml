@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.nepaliterminal.pocketspin"
-    android:versionCode="1" android:versionName="1.2">
+    android:versionCode="2" android:versionName="2.0">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="36" />
+    <uses-permission android:name="android.permission.INTERNET" />
     <queries>
-        <package android:name="com.android.chrome" />
+        <package android:name="com.spotify.music" />
         <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="https" /></intent>
-        <intent><action android:name="android.support.customtabs.action.CustomTabsService" /></intent>
     </queries>
     <application android:label="Pocket Spin" android:icon="@drawable/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="false">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true"
+            android:launchMode="singleTask" android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
