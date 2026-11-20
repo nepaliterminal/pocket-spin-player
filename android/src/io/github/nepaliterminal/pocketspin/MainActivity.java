@@ -22,6 +22,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.window.OnBackInvokedDispatcher;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -71,6 +72,10 @@ public final class MainActivity extends Activity {
             }
         });
         setContentView(web);
+        // Android 13+ with predictive Back no longer calls onBackPressed for target SDK 36.
+        if (Build.VERSION.SDK_INT >= 33)
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
         hideSystemBars();
         if (savedState == null || web.restoreState(savedState) == null) web.loadUrl(APP_URL);
     }
@@ -92,6 +97,10 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
+        handleBack();
+    }
+
+    private void handleBack() {
         Uri current = Uri.parse(String.valueOf(web.getUrl()));
         if (!APP_HOST.equals(current.getHost())) {
             if (web.canGoBack()) web.goBack(); else web.loadUrl(APP_URL);
