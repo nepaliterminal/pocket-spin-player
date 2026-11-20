@@ -57,9 +57,10 @@ test('playlist API fetches with authorization and provides targeted permission a
     return response(200,{items:[],next:null});
   });
   assert.deepEqual(await client.api('/me/playlists?limit=50'),{items:[],next:null});
+  const denied=status=>clientFor(async url=>url.includes('/api/token')?response(200,{access_token:'new',expires_in:3600}):response(status));
   for(const status of [401,403]) {
-    await assert.rejects(clientFor(async()=>response(status)).api('/me/playlists?limit=50'),/Sign in again from Spotify Setup.*playlists/);
-    await assert.rejects(clientFor(async()=>response(status)).api('/playlists/mix/items?limit=100'),/Sign in again from Spotify Setup.*playlists/);
+    await assert.rejects(denied(status).api('/me/playlists?limit=50'),/Sign in again from Spotify Setup.*playlists/);
+    await assert.rejects(denied(status).api('/playlists/mix/items?limit=100'),/Sign in again from Spotify Setup.*playlists/);
   }
   await assert.rejects(clientFor(async()=>response(404)).api('/playlists/mix/items?limit=100'),error=>error.status===404);
 });
