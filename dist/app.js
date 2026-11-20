@@ -154,10 +154,15 @@ async function connectPlayer() {
     const player=new sdk.Player({name:'Pocket Spin',volume:state.volume,getOAuthToken:cb=>client.accessToken().then(cb).catch(report)});
     state.player=player;
     await new Promise((resolve,reject)=>{
+      let ready=false;
       const timer=setTimeout(()=>reject(new Error(nativeApp?remoteHint():'Spotify audio is not ready. Reconnect in Setup or try Chrome with protected content enabled.')),15000);
       const valid=()=>epoch===state.epoch&&state.player===player;
-      const fail=message=>{clearTimeout(timer);reject(new Error(message));};
-      player.addListener('ready',({device_id})=>{clearTimeout(timer);if(!valid())return;state.deviceId=device_id;state.playerError='';updateStatus();resolve();});
+      const fail=message=>{
+        clearTimeout(timer);
+        if(!ready) reject(new Error(message));
+        else if(valid()){state.playerError=message;report(new Error(message));}
+      };
+      player.addListener('ready',({device_id})=>{clearTimeout(timer);if(!valid())return;ready=true;state.deviceId=device_id;state.playerError='';updateStatus();resolve();});
       player.addListener('not_ready',()=>{if(!valid())return;state.deviceId=null;state.active=false;state.position=position();state.updated=performance.now();state.playing=false;state.playerError='Player disconnected. Reconnect in Spotify Setup.';updateStatus();updateProgress();});
       player.addListener('player_state_changed',p=>{if(valid())applyPlayback(p);});
       player.addListener('initialization_error',()=>fail(nativeApp?remoteHint():'This browser could not start protected playback. Try Chrome and allow protected content.'));
