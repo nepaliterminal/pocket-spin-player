@@ -19,7 +19,7 @@ import android.widget.Toast;
  */
 public final class MainActivity extends Activity {
     private static final String PLAYER_URL =
-        "https://pocket-spin-player.upperstork16.chatgpt.site/?app=1";
+        "https://pocketspin100.vercel.app/?app=1";
     private static final String CHROME = "com.android.chrome";
 
     @Override public void onCreate(Bundle savedState) {

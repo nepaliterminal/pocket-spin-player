@@ -6,12 +6,12 @@ An installable, test-signed APK for Android 7.0+ (API 24). It opens the live Poc
 
 1. Transfer the APK to your Android phone and open it. Android may ask you to allow installation from that source.
 2. Keep Chrome enabled and updated.
-3. Open Pocket Spin, sign in to the private Site with its owner account, and connect Spotify if needed.
+3. Open Pocket Spin and connect Spotify if needed.
 4. Tap **Fullscreen** inside the player. **Exit fullscreen** or Android Back exits it. If the browser rejects fullscreen, the player-only layout still fits the viewport; **Show page** restores the normal page.
 
-The APK opens the existing private Site. It does not change sharing. Spotify Premium, developer-mode account access, internet connectivity, and a compatible protected-media browser remain required. The Spotify redirect URL remains the exact HTTPS Site URL with its trailing slash, not a custom Android scheme. The APK contains no client secret or saved user tokens.
+The APK opens the public Vercel deployment at https://pocketspin100.vercel.app/. Spotify Premium, developer-mode account access, internet connectivity, and a compatible protected-media browser remain required. The Spotify redirect URL remains the exact HTTPS site URL with its trailing slash (`https://pocketspin100.vercel.app/`), not a custom Android scheme. The APK contains no client secret or saved user tokens.
 
-Fullscreen needs a user gesture. Login pages retain their browser security UI. This is deliberately not claimed as an automatically fullscreen Trusted Web Activity: that requires publicly reachable domain verification, which is not guaranteed on an owner-private Site.
+Fullscreen needs a user gesture. Login pages retain their browser security UI. This is deliberately not claimed as an automatically fullscreen Trusted Web Activity: that requires publicly reachable domain verification, which this project does not set up.
 
 ## Build without dependency downloads
 

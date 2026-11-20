@@ -18,7 +18,7 @@ A nostalgic iPod Classic-inspired Spotify player for the browser. It pairs a tac
 
 Click **Fullscreen** at the top right. The side panel disappears and the whole player fits the display. Use **Exit fullscreen** or Escape to return. Browsers that deny fullscreen fall back to a player-only layout with a **Show page** exit. The Android companion starts in this layout and needs a tap on Fullscreen to hide browser controls.
 
-See [Android build and installation](android/README.md). The APK uses the same private hosted Site and Spotify settings. It is test-signed for sideloading, not a Play Store release. It requires a compatible browser, internet, and the existing Site/Spotify permissions; it does not bundle a native or offline music engine.
+See [Android build and installation](android/README.md). The APK opens the Vercel deployment (https://pocketspin100.vercel.app/) with the same Spotify settings. It is test-signed for sideloading, not a Play Store release. It requires a compatible browser, internet, and the existing Spotify permissions; it does not bundle a native or offline music engine.
 
 References: [Spotify browser support](https://developer.spotify.com/documentation/web-playback-sdk), [Android Custom Tabs](https://developer.android.com/reference/androidx/browser/customtabs/CustomTabsIntent).
 
