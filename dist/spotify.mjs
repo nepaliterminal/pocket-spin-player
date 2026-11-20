@@ -10,8 +10,9 @@ const random = () => base64url(crypto.getRandomValues(new Uint8Array(48)));
 let sdkPromise;
 
 export class SpotifyClient {
-  constructor({storage = localStorage, session = sessionStorage, request = fetch, now = Date.now} = {}) {
+  constructor({storage = localStorage, session = sessionStorage, request = fetch, now = Date.now, onLogout = () => {}} = {}) {
     this.storage = storage; this.session = session; this.request = request; this.now = now;
+    this.onLogout = onLogout;
     this.config = readJson(storage, CONFIG_KEY, {});
     if (!this.config?.clientId) this.config = {...this.config, clientId: DEFAULT_CLIENT_ID};
     this.token = readJson(storage, TOKEN_KEY, null);
@@ -26,6 +27,7 @@ export class SpotifyClient {
   logout() {
     this.generation++; this.token = null; this.refreshing = null; this.retryAt = 0;
     try { this.storage.removeItem(TOKEN_KEY); } catch { /* Storage may be disabled. */ }
+    this.onLogout();
   }
   async fetch(url, options = {}) {
     const controller = new AbortController();
