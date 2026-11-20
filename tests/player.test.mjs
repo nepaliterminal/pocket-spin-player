@@ -68,7 +68,9 @@ test('playlist API fetches with authorization and provides targeted permission a
   const denied=status=>clientFor(async url=>url.includes('/api/token')?response(200,{access_token:'new',expires_in:3600}):response(status));
   for(const status of [401,403]) {
     await assert.rejects(denied(status).api('/me/playlists?limit=50'),/Sign in again from Spotify Setup.*playlists/);
-    await assert.rejects(denied(status).api('/playlists/mix/items?limit=50'),/Sign in again from Spotify Setup.*playlists/);
+    for(const endpoint of ['items','tracks']) {
+      await assert.rejects(denied(status).api('/playlists/mix/'+endpoint+'?limit=50'),status===403?/only shares songs from playlists you own or collaborate on/:/Sign in again from Spotify Setup.*playlists/);
+    }
   }
   await assert.rejects(clientFor(async()=>response(404)).api('/playlists/mix/items?limit=50'),error=>error.status===404);
 });
