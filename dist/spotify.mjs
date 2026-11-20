@@ -67,7 +67,7 @@ export class SpotifyClient {
     });
     if (generation !== this.generation) throw new Error('Session changed.');
     const playlistPath = /^\/(me\/playlists|playlists\/)/.test(path);
-    if (/^\/playlists\//.test(path) && response.status === 403) throw new Error('Spotify only shares songs from playlists you own or collaborate on with this app.');
+    if (/^\/playlists\//.test(path) && response.status === 403) throw new Error('Spotify only shares songs from playlists you own or collaborate on with this app. If this is your playlist, sign in again from Spotify Setup.');
     if (playlistPath && (response.status === 403 || (response.status === 401 && !retry))) throw new Error('Sign in again from Spotify Setup to allow access to your playlists.');
     if (playlistPath && response.status === 404) throw Object.assign(new Error('This playlist is not available. Please try again.'), {status:404});
     if (response.status === 401 && retry) { await this.accessToken(true); return this.api(path, options, false); }
