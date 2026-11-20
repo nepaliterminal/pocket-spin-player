@@ -28,12 +28,17 @@ export function playlistFrom(raw) {
     image:artwork(raw.images), uri:raw.uri || '', total:raw.items?.total ?? raw.tracks?.total ?? 0};
 }
 export function playlistTracks(items = []) {
-  return uniqueTracks(items).filter(track => track.playable);
+  return items.map((item, position) => {
+    const raw = item && 'item' in item ? item.item : item?.track || item;
+    const track = trackFrom(raw);
+    return raw?.type !== 'episode' && track?.playable ? {...track, position} : null;
+  }).filter(Boolean);
 }
 export function playlistPlaybackBody(track, playlist, queue = []) {
   if (!playlist?.uri) return playbackBody(track, queue);
   if (!track?.playable) throw new Error('This track cannot be played here. Choose another song.');
-  return {context_uri:playlist.uri, offset:{uri:track.uri}, position_ms:0};
+  const offset = Number.isInteger(track.position) && track.position >= 0 ? {position:track.position} : {uri:track.uri};
+  return {context_uri:playlist.uri, offset, position_ms:0};
 }
 export function playbackBody(track, queue = []) {
   if (!track?.playable) throw new Error('This track cannot be played here. Choose another song.');

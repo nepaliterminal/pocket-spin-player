@@ -40,15 +40,23 @@ test('playlists normalize metadata and tolerate missing values',()=>{
   assert.equal(playlistFrom({id:'empty'}).owner,'Unknown owner');
 });
 test('playlist items accept old and new wrappers and skip local, null, and episodes',()=>{
-  assert.deepEqual(playlistTracks([{track:rawTrack('one')},{item:rawTrack('two')},{item:rawTrack('one')},{item:null},{track:null},{item:{...rawTrack('local'),is_local:true}},{item:{name:'Podcast',type:'episode',uri:'spotify:episode:one'}}]).map(t=>t.name),['one','two']);
+  assert.deepEqual(playlistTracks([{track:rawTrack('one')},{item:rawTrack('two')},{item:rawTrack('one')},{item:null},{track:null},{item:{...rawTrack('local'),is_local:true}},{item:{name:'Podcast',type:'episode',uri:'spotify:episode:one'}}]).map(t=>t.name),['one','two','one']);
   assert.deepEqual(playlistTracks(),[]);
 });
-test('playlist playback uses context and URI offset or falls back to the queue',()=>{
+test('playlist playback uses context and position offset or falls back to URI and queue',()=>{
   const tracks=playlistTracks([{item:rawTrack('one')},{track:rawTrack('two')}]);
-  assert.deepEqual(playlistPlaybackBody(tracks[1],{uri:'spotify:playlist:mix'},tracks),{context_uri:'spotify:playlist:mix',offset:{uri:'spotify:track:two'},position_ms:0});
+  assert.deepEqual(playlistPlaybackBody(tracks[1],{uri:'spotify:playlist:mix'},tracks),{context_uri:'spotify:playlist:mix',offset:{position:1},position_ms:0});
+  assert.deepEqual(playlistPlaybackBody({...tracks[1],position:undefined},{uri:'spotify:playlist:mix'}),{context_uri:'spotify:playlist:mix',offset:{uri:'spotify:track:two'},position_ms:0});
   assert.deepEqual(playlistPlaybackBody(tracks[1],{},tracks),playbackBody(tracks[1],tracks));
   assert.throws(()=>playlistPlaybackBody(null,{uri:'spotify:playlist:mix'}),/cannot be played/);
   assert.throws(()=>playlistPlaybackBody(null,null),/cannot be played/);
+});
+test('repeated playlist songs retain original positions across skipped episodes',()=>{
+  const tracks=playlistTracks([{item:rawTrack('one')},{item:{name:'Podcast',type:'episode',uri:'spotify:episode:one'}},{track:rawTrack('one')},{item:null},{item:rawTrack('two')}]);
+  assert.deepEqual(tracks.map(track=>[track.name,track.position]),[['one',0],['one',2],['two',4]]);
+  const playlist={uri:'spotify:playlist:mix'};
+  assert.deepEqual(playlistPlaybackBody(tracks[0],playlist).offset,{position:0});
+  assert.deepEqual(playlistPlaybackBody(tracks[1],playlist).offset,{position:2});
 });
 test('playlist API fetches with authorization and provides targeted permission and 404 errors',async()=>{
   const client=clientFor(async(url,options)=>{
