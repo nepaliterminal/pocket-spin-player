@@ -1,5 +1,5 @@
 /* Pocket Spin: browser-only PKCE. Never put a client secret in this app. */
-import { clamp, setPageCursor, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta } from './core.mjs';
+import { clamp, setPageCursor, clampPageCursor, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta } from './core.mjs';
 import { SpotifyClient, loadSdk } from './spotify.mjs';
 import { installFullscreen } from './fullscreen.mjs';
 
@@ -104,7 +104,7 @@ function go(page) {
   render();
   if(page==='playlists'&&!state.playlistsLoaded&&!state.playlistsLoading) run(loadPlaylists);
 }
-function back() { Object.assign(state,state.stack.pop()||{page:'home',cursor:0}); render(); }
+function back() { Object.assign(state,state.stack.pop()||{page:'home',cursor:0}); clampPageCursor(state,items().length); render(); }
 function home() { state.page='home';state.cursor=0;state.stack=[];render(); }
 function select() {
   if(state.page==='home') return go(menuItems[state.cursor][1]);

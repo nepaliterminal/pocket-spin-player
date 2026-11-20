@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { artwork, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson, clamp, setPageCursor } from '../dist/core.mjs';
+import { artwork, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson, clamp, setPageCursor, clampPageCursor } from '../dist/core.mjs';
 import { SpotifyClient, DEFAULT_CLIENT_ID } from '../dist/spotify.mjs';
 import { playerScale } from '../dist/fullscreen.mjs';
 
@@ -13,6 +13,14 @@ const clientFor = (request, saved=token) => new SpotifyClient({storage:memory({
 }),session:memory(),request,now:()=>1000});
 const rawTrack = (id, images=[]) => ({name:id,uri:'spotify:track:'+id,artists:[{name:'Artist'}],album:{name:'Album',images},duration_ms:100000});
 
+test('restored page cursor stays within a changed or empty list',()=>{
+  for(const [cursor,length,expected] of [[4,2,1],[4,0,0],[1,3,1],[-1,3,0]]) {
+    const state={page:'library',cursor};
+    clampPageCursor(state,length);
+    assert.equal(state.cursor,expected);
+    assert.equal(state.page,'library');
+  }
+});
 test('library and playlist completion only clamps the cursor on its own page',async()=>{
   for(const owner of ['library','playlists','playlist']) {
     for(const length of [0,2,10]) {
