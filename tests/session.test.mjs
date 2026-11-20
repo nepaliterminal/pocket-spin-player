@@ -32,7 +32,9 @@ test('automatic logout clears private app state and ignores pending SDK sync',as
     client.saveToken({access_token:'private-token',expires_in:3600});
     Object.assign(state,{page:'search',cursor:3,stack:[{page:'library',cursor:2}],player,deviceId:'device',active:true,
       library:[{name:'private-song'}],results:[{name:'private-song'}],track:{name:'private-song'},query:'private-query',
-      searched:true,searching:true,loading:true,libraryError:'private-error'});
+      searched:true,searching:true,loading:true,libraryError:'private-error',
+      playlists:[{name:'private-playlist'}],playlistsLoaded:true,playlistsLoading:true,playlistsError:'private-error',
+      playlist:{name:'private-playlist'},playlistTracks:[{name:'private-song'}],playlistLoading:true,playlistError:'private-error'});
     screen.innerHTML='private-song private-query';
   `,context);
   const pending=vm.runInContext('sync()',context);
@@ -42,6 +44,8 @@ test('automatic logout clears private app state and ignores pending SDK sync',as
   assert.equal(vm.runInContext(`JSON.stringify([state.library,state.results,state.track,state.query,state.searched,state.searching,state.loading,state.libraryError,state.player,state.deviceId,state.page,state.cursor,state.stack])`,context),
     JSON.stringify([[],[],null,'',false,false,false,'',null,null,'home',0,[]]));
   assert.doesNotMatch(element('#screen').innerHTML,/private-/);
+  assert.equal(vm.runInContext(`JSON.stringify([state.playlists,state.playlistsLoaded,state.playlistsLoading,state.playlistsError,state.playlist,state.playlistTracks,state.playlistLoading,state.playlistError])`,context),
+    JSON.stringify([[],false,false,'',null,[],false,'']));
   release({paused:false,position:0,track_window:{current_track:{name:'private-song',uri:'spotify:track:private'}}});
   await pending;
   assert.equal(vm.runInContext('state.track',context),null);
