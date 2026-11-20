@@ -13,7 +13,7 @@ const demoTracks = [
 ];
 const menuItems = [
   ['Now Playing','now'], ['Recently Played','library'], ['Playlists','playlists'], ['Search Songs','search'],
-  ['Spotify Setup','settings'], ['About Pocket Spin','about']
+  ['Spotify Setup','settings'], ['Help','help']
 ];
 const state = {
   page:'home', cursor:0, stack:[], track:null, playing:false, position:0, updated:performance.now(),
@@ -63,6 +63,16 @@ function settingsView() {
   if(nativeApp) return topbar('Spotify Setup')+'<div class="screen-scroll connect"><p>'+(demo()?'Sign in with your Spotify account to play your music.':'Signed in to Spotify.')+'</p><form id="loginForm"><input type="hidden" id="clientId" value="'+esc(client.config.clientId||'')+'"><button class="screen-action" type="submit">'+(demo()?'Sign in with Spotify':'Sign in again')+'</button></form>'+(demo()?'':button('Reconnect audio player','reconnect')+button('Sign out','signout'))+'<label for="volume">Volume</label><input id="volume" aria-label="Volume" type="range" min="0" max="100" value="'+Math.round(state.volume*100)+'"><p class="legal">Spotify Premium is required to play music. Music plays through the Spotify app on this phone.</p></div>';
   return topbar('Spotify Setup')+'<div class="screen-scroll connect"><p>Use your Spotify app’s Client ID. Never enter a client secret.</p><form id="loginForm"><label for="clientId">Client ID</label><input class="field" id="clientId" value="'+esc(client.config.clientId||'')+'" placeholder="32-character Client ID" autocomplete="off" spellcheck="false" required><label for="redirect">Redirect URL (exact match)</label><input class="field" id="redirect" readonly value="'+esc(redirect())+'"><button class="screen-action" type="submit">'+(demo()?'Sign in with Spotify':'Sign in again')+'</button></form>'+(demo()?'':button('Reconnect audio player','reconnect')+button('Sign out on this browser','signout'))+'<label for="volume">Volume</label><input id="volume" aria-label="Volume" type="range" min="0" max="100" value="'+Math.round(state.volume*100)+'"><p class="legal">Browser playback requires Spotify Premium. Development apps must allow your account in their dashboard. Select Web API and Web Playback SDK. Allow protected-content playback in your browser.</p></div>';
 }
+const helpTopics=[
+  ['The screen','Like a real iPod, the screen is not a touch screen. Use the wheel and its buttons. The only parts you can tap are the search box, sliders, the Spotify Setup buttons and the Open in Spotify link.'],
+  ['Scroll','Slide your finger around the ring of the wheel. Clockwise moves down, counterclockwise moves up. On this page it scrolls the text.'],
+  ['Select','Press the center button to open the highlighted item or play the highlighted song.'],
+  ['MENU','Press MENU at the top of the wheel to go back one screen. The phone’s Back button does the same.'],
+  ['Play and skip','▶Ⅱ at the bottom plays or pauses. ▶▶ skips to the next song and ◀◀ goes back one.'],
+  ['Get your music','Go to Spotify Setup and press the center button to sign in. Playing needs Spotify Premium, and the music plays through the Spotify app on this phone.'],
+  ['Find songs','Recently Played lists your latest songs, and Playlists has your playlists. In Search Songs, tap the box, type, then press Find.']
+];
+const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.4</p></div>';
 function render() {
   if(state.page==='now') screen.innerHTML=nowView();
   else if(state.page==='library') screen.innerHTML=libraryView();
@@ -70,7 +80,8 @@ function render() {
   else if(state.page==='playlist') screen.innerHTML=playlistView();
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
-  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.2</p></div>';
+  else if(state.page==='help') screen.innerHTML=helpView();
+  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.4</p></div>';
   else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
   if(['library','search','playlists','playlist'].includes(state.page)) {
@@ -101,7 +112,8 @@ function notify(message) {
 }
 function items() { return state.page==='home'?menuItems:state.page==='library'?(demo()?demoTracks:state.library):state.page==='search'?state.results:state.page==='playlists'?state.playlistsLoading||state.playlistsError?[]:state.playlists:state.page==='playlist'?state.playlistLoading||state.playlistError?[]:state.playlistTracks:[]; }
 function move(delta) {
-  const list=items(); if(!list.length) return;
+  const list=items();
+  if(!list.length) {const text=screen.querySelector('.screen-scroll');if(text)text.scrollTop+=delta*36;return;}
   state.cursor=(state.cursor+delta+list.length)%list.length; render();
 }
 function go(page) {
@@ -123,6 +135,7 @@ function select() {
   }
   if(state.page==='playlist') return playTrack(items()[state.cursor],items(),state.playlist);
   if(state.page==='now') return togglePlay();
+  if(state.page==='settings'&&demo()) return $('#loginForm')?.requestSubmit();
 }
 function applyPlayback(playback) {
   if(!playback) { state.position=position();state.updated=performance.now();state.playing=false;state.active=false;updateProgress();return; }
@@ -202,6 +215,21 @@ async function connectRemote(epoch) {
 const remoteHint=()=>nativeApp
   ? (android.hasSpotifyApp()?'Open the Spotify app on this phone, then press Play in Pocket Spin.':'Install the Spotify app on this phone, then press Play in Pocket Spin.')
   : 'Open Spotify on any device, then press Play here.';
+// Spotify drops an idle phone from its device list, so a 404 means find the phone again (or open Spotify) and retry once.
+async function withDevice(command,retry=true) {
+  try {return await command();}
+  catch(error) {
+    if(error.status!==404||!state.player?.remote) throw error;
+    state.player=null;state.deviceId=null;
+    // A toggle is not repeated: the new device's state decides play or pause, which may reverse what was pressed.
+    if(await connectRemote(state.epoch).catch(()=>false)) {if(retry)return command();throw new Error('Found Spotify on this phone again. Press Play once more.');}
+    if(nativeApp) {
+      const installed=android.hasSpotifyApp();android.openSpotify();
+      throw new Error(installed?'Spotify opened. Play any song there, then come back to Pocket Spin and press Play again.':'Install the Spotify app to play music, then press Play again.');
+    }
+    throw new Error(remoteHint());
+  }
+}
 async function readyForPlayback() {
   // Activate synchronously inside the user's gesture, before any network wait.
   const activation=state.player?.activateElement?.();
@@ -226,7 +254,7 @@ async function playTrack(track,queue=[],playlist=null) {
   state.busy=true;state.error='';updateStatus();updateProgress();
   try {
     await ready;
-    await client.api('/me/player/play?device_id='+encodeURIComponent(state.player?.target?.()||state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playlist?playlistPlaybackBody(track,playlist,queue):playbackBody(track,queue))});
+    await withDevice(()=>client.api('/me/player/play?device_id='+encodeURIComponent(state.player?.target?.()||state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playlist?playlistPlaybackBody(track,playlist,queue):playbackBody(track,queue))}));
     state.track=track;state.position=0;state.updated=performance.now();state.playing=true;state.active=true;go('now');render();
   } finally {state.busy=false;updateProgress();}
   settle();
@@ -241,7 +269,7 @@ async function togglePlay() {
   }
   const ready=readyForPlayback();
   state.busy=true;
-  try {await ready;await state.player.togglePlay();state.position=position();state.updated=performance.now();state.playing=!state.playing;updateStatus();}
+  try {await ready;await withDevice(()=>state.player.togglePlay(),false);state.position=position();state.updated=performance.now();state.playing=!state.playing;updateStatus();}
   finally {state.busy=false;updateProgress();}
   settle();
 }
@@ -251,7 +279,7 @@ async function skip(direction) {
   await readyForPlayback();
   if(!state.active) return togglePlay();
   state.busy=true;
-  try {await state.player[direction>0?'nextTrack':'previousTrack']();}finally{state.busy=false;updateProgress();}
+  try {await withDevice(()=>state.player[direction>0?'nextTrack':'previousTrack']());}finally{state.busy=false;updateProgress();}
   settle();
 }
 async function loadLibrary() {

@@ -80,7 +80,7 @@ export class SpotifyClient {
     }
     if (response.status === 403) throw new Error('Spotify denied access. Check Premium, your app’s allowed users, and permissions in Setup.');
     if (response.status === 401) { this.logout(); throw new Error('Your session expired. Please sign in again from Setup.'); }
-    if (response.status === 404) throw new Error('The Spotify player is not available yet. Reconnect the player in Setup.');
+    if (response.status === 404) throw Object.assign(new Error('The Spotify player is not available yet. Reconnect the player in Setup.'), {status:404});
     if (!response.ok) throw new Error(`Spotify could not complete that request (${response.status}). Please try again.`);
     // Player commands can answer 200 with a non-JSON body, so an unreadable body counts as empty.
     const body = await response.text();
