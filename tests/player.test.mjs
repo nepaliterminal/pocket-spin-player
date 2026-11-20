@@ -24,7 +24,7 @@ test('restored page cursor stays within a changed or empty list',()=>{
 test('library and playlist completion only clamps the cursor on its own page',async()=>{
   for(const owner of ['library','playlists','playlist']) {
     for(const length of [0,2,10]) {
-      for(const page of ['library','playlists','playlist','home','search','settings','now','about']) {
+      for(const page of ['library','playlists','playlist','home','search','settings','now','help','about']) {
         const state={page:owner,cursor:4};
         let complete;
         const pending=new Promise(resolve=>{complete=resolve;}).finally(()=>{
@@ -46,7 +46,7 @@ test('failed library completion preserves another page cursor',async()=>{
 });
 test('search completion only resets the cursor while viewing search',async()=>{
   for(const results of [[],[rawTrack('one')]]) {
-    for(const page of ['search','home','library','playlists','playlist','settings','now','about']) {
+    for(const page of ['search','home','library','playlists','playlist','settings','now','help','about']) {
       const state={page:'search',cursor:4,results:[]};
       let complete;
       const pending=new Promise(resolve=>{complete=resolve;}).then(data=>{
