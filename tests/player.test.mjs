@@ -280,3 +280,16 @@ test('player commands that answer 200 with a non-JSON body do not fail',async()=
   const json=clientFor(async()=>response(200,{ok:1}));
   assert.deepEqual(await json.api('/me'),{ok:1});
 });
+test('the Android app keeps playing on the phone while a computer is active',async()=>{
+  const calls=[];
+  const client=clientFor(async(url,options)=>{
+    calls.push((options.method||'GET')+' '+url.replace('https://api.spotify.com/v1',''));
+    if(url.endsWith('/devices')) return response(200,{devices:[{id:'mac',type:'Computer',is_active:true},{id:'me',type:'Smartphone',name:'Pixel 8'}]});
+    if(url.endsWith('/me/player')) return response(200,{is_playing:true,device:{id:'mac',type:'Computer'},item:rawTrack('x')});
+    return response(204);
+  });
+  const remote=await remotePlayer(client,{phoneOnly:true,model:'Pixel 8'});
+  await remote.nextTrack();
+  assert.equal(remote.target(),'me');
+  assert.equal(calls.at(-1),'POST /me/player/next?device_id=me');
+});

@@ -140,7 +140,8 @@ export async function remotePlayer(client, options) {
   // Follow playback when the user moves it to another device, so controls act on the song shown.
   const getCurrentState = async () => {
     const playback = await client.api('/me/player');
-    if (playback?.device?.id) target = playback.device.id;
+    const moved = playback?.device;
+    if (moved?.id && (!options?.phoneOnly || moved.type === 'Smartphone')) target = moved.id;
     const state = remoteState(playback);
     playing = !!state && !state.paused;
     return state;
