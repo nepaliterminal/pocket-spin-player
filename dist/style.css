@@ -95,5 +95,5 @@ button:disabled { opacity:.55; cursor:wait; }
 .native-app.player-mode .player { top:50%; }
 /* Like an iPod, the screen ignores touch: only typing, sign-in and sliders take taps; the wheel does the rest. */
 .screen { pointer-events:none; }
-.screen input, .screen form button, .screen .screen-action { pointer-events:auto; }
+.screen input, .screen form button, .screen .screen-action, .screen a { pointer-events:auto; }
 .help h3 { font-size:12px; margin:10px 0 2px; }
