@@ -143,8 +143,10 @@ function applyPlayback(playback) {
   const track=trackFrom(playback.track_window?.current_track); if(!track) return;
   track.duration=playback.duration||track.duration;
   const changed=track.uri!==state.track?.uri || track.image!==state.track?.image;
+  const modes=state.shuffle+':'+state.repeat;
   if(playback.shuffle!==undefined)state.shuffle=!!playback.shuffle;
   if(playback.repeat_mode!==undefined)state.repeat=playback.repeat_mode;
+  if(state.page==='home'&&modes!==state.shuffle+':'+state.repeat)render();
   state.track=track;state.position=playback.position;state.updated=performance.now();state.playing=!playback.paused;state.active=true;
   if(changed&&state.page==='now') render(); else {updateStatus();updateProgress();}
 }
