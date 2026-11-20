@@ -188,6 +188,8 @@ public final class MainActivity extends Activity {
     private final class Bridge {
         @JavascriptInterface public boolean isApp() { return true; }
 
+        @JavascriptInterface public String deviceModel() { return Build.MODEL; }
+
         @JavascriptInterface public boolean hasSpotifyApp() {
             return getPackageManager().getLaunchIntentForPackage(SPOTIFY_PACKAGE) != null;
         }

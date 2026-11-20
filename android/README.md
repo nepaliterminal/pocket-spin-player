@@ -15,7 +15,7 @@ Spotify Premium and internet access are required. If the Spotify app is in Devel
 
 - Sign-in uses Authorization Code + PKCE with the built-in Client ID. The redirect URI is the existing Site URL `https://pocket-spin-player.upperstork16.chatgpt.site/` (trailing slash), which must stay registered in the Spotify dashboard. The app answers that address from its own bundled files, so the Spotify redirect returns into the app and never reaches the Site.
 - Use email/password, Facebook or Apple on the Spotify login page. Google blocks its sign-in inside embedded WebViews.
-- Audio first tries Spotify's Web Playback SDK inside the app (Widevine protected media is granted only to the bundled player). If that cannot start, Pocket Spin plays through the Spotify app on the phone via Spotify Connect: pressing Play opens the Spotify app when it is not running yet; come back and press Play again.
+- Audio plays through the Spotify app on the phone via Spotify Connect (Spotify's Web Playback SDK does not support Android). Pocket Spin only ever picks a phone, never a computer or speaker; pressing Play opens the Spotify app when it is not running yet; come back and press Play again.
 - Tokens stay in the app's WebView storage. There is no client secret in the APK.
 
 ## Build without dependency downloads

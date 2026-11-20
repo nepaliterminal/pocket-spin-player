@@ -245,6 +245,10 @@ test('remote device choice prefers the active device, then a phone, never the in
   assert.equal(pickDevice([{id:'b',type:'Computer',is_active:true},{id:'c',type:'Smartphone'}]).id,'b');
   assert.equal(pickDevice([{id:'r',type:'Smartphone',is_restricted:true},{id:null}]),null);
   assert.equal(pickDevice(undefined),null);
+  const devices=[{id:'mac',type:'Computer',is_active:true},{id:'tab',type:'Smartphone',name:'Galaxy Tab'},{id:'me',type:'Smartphone',name:'Pixel 8'}];
+  assert.equal(pickDevice(devices,{phoneOnly:true,model:'Pixel 8'}).id,'me');
+  assert.equal(pickDevice(devices,{phoneOnly:true}).id,'tab');
+  assert.equal(pickDevice([{id:'mac',type:'Computer',is_active:true}],{phoneOnly:true}),null);
 });
 test('remote playback state maps to the in-app player shape',()=>{
   assert.equal(remoteState(null),null);
@@ -269,4 +273,10 @@ test('remote player controls the chosen Spotify device through the Web API',asyn
   assert.deepEqual(calls,['GET /me/player','POST /me/player/next?device_id=tv%202']);
   const none=clientFor(async()=>response(200,{devices:[]}));
   assert.equal(await remotePlayer(none),null);
+});
+test('player commands that answer 200 with a non-JSON body do not fail',async()=>{
+  const client=clientFor(async()=>new Response('3a7f0c9e',{status:200}));
+  assert.equal(await client.api('/me/player/next',{method:'POST'}),null);
+  const json=clientFor(async()=>response(200,{ok:1}));
+  assert.deepEqual(await json.api('/me'),{ok:1});
 });
