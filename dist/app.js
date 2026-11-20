@@ -144,11 +144,13 @@ async function connectPlayer() {
   if(state.connecting) return state.connecting;
   if(state.deviceId) return;
   const epoch=state.epoch;
+  let sdkStarted=false;
   const task=(async()=>{
     state.playerError='';updateStatus();
     if(sdkFailed) {if(await connectRemote(epoch))return;throw new Error(remoteHint());}
     await client.accessToken();const sdk=await loadSdk();
     if(epoch!==state.epoch) return;
+    sdkStarted=true;
     const player=new sdk.Player({name:'Pocket Spin',volume:state.volume,getOAuthToken:cb=>client.accessToken().then(cb).catch(report)});
     state.player=player;
     await new Promise((resolve,reject)=>{
@@ -169,7 +171,7 @@ async function connectPlayer() {
   state.connecting=task;
   try {await task;} catch(error) {
     if(epoch!==state.epoch)return;
-    const fromSdk=!sdkFailed&&!state.player?.remote;
+    const fromSdk=sdkStarted&&!state.player?.remote;
     state.player?.disconnect();state.player=null;state.deviceId=null;
     if(fromSdk) {sdkFailed=true;if(await connectRemote(epoch).catch(()=>false))return;}
     state.playerError=error.message;updateStatus();throw error;
