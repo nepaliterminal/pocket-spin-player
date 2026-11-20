@@ -293,3 +293,7 @@ test('the Android app keeps playing on the phone while a computer is active',asy
   assert.equal(remote.target(),'me');
   assert.equal(calls.at(-1),'POST /me/player/next?device_id=me');
 });
+test('a missing Spotify device is reported with status 404 so the app can find the phone again',async()=>{
+  const client=clientFor(async()=>response(404,{}));
+  await assert.rejects(client.api('/me/player/next',{method:'POST'}),error=>error.status===404);
+});

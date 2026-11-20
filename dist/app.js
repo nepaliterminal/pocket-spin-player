@@ -72,7 +72,7 @@ const helpTopics=[
   ['Get your music','Go to Spotify Setup and press the center button to sign in. Playing needs Spotify Premium, and the music plays through the Spotify app on this phone.'],
   ['Find songs','Recently Played lists your latest songs, and Playlists has your playlists. In Search Songs, tap the box, type, then press Find.']
 ];
-const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.3</p></div>';
+const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.4</p></div>';
 function render() {
   if(state.page==='now') screen.innerHTML=nowView();
   else if(state.page==='library') screen.innerHTML=libraryView();
@@ -81,7 +81,7 @@ function render() {
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
   else if(state.page==='help') screen.innerHTML=helpView();
-  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.3</p></div>';
+  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.4</p></div>';
   else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
   if(['library','search','playlists','playlist'].includes(state.page)) {
@@ -215,6 +215,20 @@ async function connectRemote(epoch) {
 const remoteHint=()=>nativeApp
   ? (android.hasSpotifyApp()?'Open the Spotify app on this phone, then press Play in Pocket Spin.':'Install the Spotify app on this phone, then press Play in Pocket Spin.')
   : 'Open Spotify on any device, then press Play here.';
+// Spotify drops an idle phone from its device list, so a 404 means find the phone again (or open Spotify) and retry once.
+async function withDevice(command) {
+  try {return await command();}
+  catch(error) {
+    if(error.status!==404||!state.player?.remote) throw error;
+    state.player=null;state.deviceId=null;
+    if(await connectRemote(state.epoch).catch(()=>false)) return command();
+    if(nativeApp) {
+      const installed=android.hasSpotifyApp();android.openSpotify();
+      throw new Error(installed?'Spotify opened. Play any song there, then come back to Pocket Spin and press Play again.':'Install the Spotify app to play music, then press Play again.');
+    }
+    throw new Error(remoteHint());
+  }
+}
 async function readyForPlayback() {
   // Activate synchronously inside the user's gesture, before any network wait.
   const activation=state.player?.activateElement?.();
@@ -239,7 +253,7 @@ async function playTrack(track,queue=[],playlist=null) {
   state.busy=true;state.error='';updateStatus();updateProgress();
   try {
     await ready;
-    await client.api('/me/player/play?device_id='+encodeURIComponent(state.player?.target?.()||state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playlist?playlistPlaybackBody(track,playlist,queue):playbackBody(track,queue))});
+    await withDevice(()=>client.api('/me/player/play?device_id='+encodeURIComponent(state.player?.target?.()||state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playlist?playlistPlaybackBody(track,playlist,queue):playbackBody(track,queue))}));
     state.track=track;state.position=0;state.updated=performance.now();state.playing=true;state.active=true;go('now');render();
   } finally {state.busy=false;updateProgress();}
   settle();
@@ -254,7 +268,7 @@ async function togglePlay() {
   }
   const ready=readyForPlayback();
   state.busy=true;
-  try {await ready;await state.player.togglePlay();state.position=position();state.updated=performance.now();state.playing=!state.playing;updateStatus();}
+  try {await ready;await withDevice(()=>state.player.togglePlay());state.position=position();state.updated=performance.now();state.playing=!state.playing;updateStatus();}
   finally {state.busy=false;updateProgress();}
   settle();
 }
@@ -264,7 +278,7 @@ async function skip(direction) {
   await readyForPlayback();
   if(!state.active) return togglePlay();
   state.busy=true;
-  try {await state.player[direction>0?'nextTrack':'previousTrack']();}finally{state.busy=false;updateProgress();}
+  try {await withDevice(()=>state.player[direction>0?'nextTrack':'previousTrack']());}finally{state.busy=false;updateProgress();}
   settle();
 }
 async function loadLibrary() {
