@@ -97,3 +97,4 @@ button:disabled { opacity:.55; cursor:wait; }
 .screen { pointer-events:none; }
 .screen input, .screen form button, .screen .screen-action, .screen a { pointer-events:auto; }
 .help h3 { font-size:12px; margin:10px 0 2px; }
+.menu-item span { float:right; font-size:12px; opacity:.75; }

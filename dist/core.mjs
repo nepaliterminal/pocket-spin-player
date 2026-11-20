@@ -69,8 +69,10 @@ export function pickDevice(devices = [], {skipName = 'Pocket Spin', phoneOnly = 
   }
   return usable.find(d => d.is_active) || usable.find(d => d.type === 'Smartphone') || usable[0] || null;
 }
+// Spotify's Web API names for the SDK's repeat_mode 0, 1 and 2.
+export const repeatModes = ['off', 'context', 'track'];
 export function remoteState(playback) {
   if (!playback?.item) return null;
   return {paused:!playback.is_playing, position:playback.progress_ms || 0, duration:playback.item.duration_ms || 0,
-    track_window:{current_track:playback.item}};
+    track_window:{current_track:playback.item}, shuffle:!!playback.shuffle_state, repeat_mode:repeatModes.indexOf(playback.repeat_state) >= 0 ? repeatModes.indexOf(playback.repeat_state) : 0};
 }

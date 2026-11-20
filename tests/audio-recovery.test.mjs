@@ -44,3 +44,14 @@ test('SDK errors after readiness remain visible',async()=>{
   assert.match(vm.runInContext('state.error',context),/Spotify Premium/);
   assert.equal(fallback.attempted,false);
 });
+
+test('Shuffle and Repeat menu items cycle like an iPod',async()=>{
+  const {context}=await loadApp(undefined,'ready');
+  vm.runInContext("client.token=null;state.page='home';state.cursor=menuItems.findIndex(([,page])=>page==='shuffle');",context);
+  await vm.runInContext('select()',context);
+  assert.equal(vm.runInContext('state.shuffle',context),true);
+  vm.runInContext("state.cursor=menuItems.findIndex(([,page])=>page==='repeat');",context);
+  await vm.runInContext('select()',context);await vm.runInContext('select()',context);
+  assert.equal(vm.runInContext('state.repeat',context),2);
+  assert.equal(vm.runInContext("state.page",context),'home');
+});
