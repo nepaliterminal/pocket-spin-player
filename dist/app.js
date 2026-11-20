@@ -73,7 +73,7 @@ const helpTopics=[
   ['Shuffle and Repeat','In the Music menu, highlight Shuffle and press the center button to switch between Off and Songs. Repeat cycles Off, All (the whole list) and One (this song). A song must be playing first.'],
   ['Find songs','Recently Played lists your latest songs, and Playlists has your playlists. In Search Songs, tap the box, type, then press Find.']
 ];
-const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.5</p></div>';
+const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.6</p></div>';
 function render() {
   if(state.page==='now') screen.innerHTML=nowView();
   else if(state.page==='library') screen.innerHTML=libraryView();
@@ -82,7 +82,7 @@ function render() {
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
   else if(state.page==='help') screen.innerHTML=helpView();
-  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.5</p></div>';
+  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.6</p></div>';
   else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+(page==='shuffle'?'<span>'+(state.shuffle?'Songs':'Off')+'</span>':page==='repeat'?'<span>'+['Off','All','One'][state.repeat]+'</span>':'')+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
   if(['home','library','search','playlists','playlist'].includes(state.page)) {
