@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { artwork, uniqueTracks, playbackBody, escapeHtml, formatTime, angleDelta, readJson, clamp, setPageCursor } from '../dist/core.mjs';
+import { artwork, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson, clamp, setPageCursor } from '../dist/core.mjs';
 import { SpotifyClient, DEFAULT_CLIENT_ID } from '../dist/spotify.mjs';
 import { playerScale } from '../dist/fullscreen.mjs';
 
@@ -13,17 +13,19 @@ const clientFor = (request, saved=token) => new SpotifyClient({storage:memory({
 }),session:memory(),request,now:()=>1000});
 const rawTrack = (id, images=[]) => ({name:id,uri:'spotify:track:'+id,artists:[{name:'Artist'}],album:{name:'Album',images},duration_ms:100000});
 
-test('library completion only clamps the cursor while viewing the library',async()=>{
-  for(const length of [0,2,10]) {
-    for(const page of ['library','home','search','settings','now','about']) {
-      const state={page:'library',cursor:4};
-      let complete;
-      const pending=new Promise(resolve=>{complete=resolve;}).finally(()=>{
-        setPageCursor(state,'library',clamp(state.cursor,0,Math.max(0,length-1)));
-      });
-      state.page=page;
-      complete();await pending;
-      assert.equal(state.cursor,page==='library'?Math.min(4,Math.max(0,length-1)):4);
+test('library and playlist completion only clamps the cursor on its own page',async()=>{
+  for(const owner of ['library','playlists','playlist']) {
+    for(const length of [0,2,10]) {
+      for(const page of ['library','playlists','playlist','home','search','settings','now','about']) {
+        const state={page:owner,cursor:4};
+        let complete;
+        const pending=new Promise(resolve=>{complete=resolve;}).finally(()=>{
+          setPageCursor(state,owner,clamp(state.cursor,0,Math.max(0,length-1)));
+        });
+        state.page=page;
+        complete();await pending;
+        assert.equal(state.cursor,page===owner?Math.min(4,Math.max(0,length-1)):4);
+      }
     }
   }
 });
@@ -36,7 +38,7 @@ test('failed library completion preserves another page cursor',async()=>{
 });
 test('search completion only resets the cursor while viewing search',async()=>{
   for(const results of [[],[rawTrack('one')]]) {
-    for(const page of ['search','home','library','settings','now','about']) {
+    for(const page of ['search','home','library','playlists','playlist','settings','now','about']) {
       const state={page:'search',cursor:4,results:[]};
       let complete;
       const pending=new Promise(resolve=>{complete=resolve;}).then(data=>{
@@ -68,6 +70,49 @@ test('artwork chooses full resolution regardless of API array order',()=>{
 });
 test('recent library deduplicates and tolerates unavailable tracks',()=>{
   assert.deepEqual(uniqueTracks([{track:rawTrack('one')},{track:null},{track:rawTrack('one')},{track:rawTrack('two')}]).map(t=>t.name),['one','two']);
+});
+test('playlists normalize metadata and tolerate missing values',()=>{
+  assert.equal(playlistFrom(null),null);
+  assert.equal(playlistFrom({name:'Missing id'}),null);
+  assert.deepEqual(playlistFrom({id:'mix',name:'Mix',owner:{display_name:'DJ'},images:[{url:'https://images.test/mix'}],uri:'spotify:playlist:mix',tracks:{total:3}}),
+    {id:'mix',name:'Mix',owner:'DJ',image:'https://images.test/mix',uri:'spotify:playlist:mix',total:3});
+  assert.equal(playlistFrom({id:'empty',items:{total:0}}).total,0);
+  assert.equal(playlistFrom({id:'empty'}).owner,'Unknown owner');
+});
+test('playlist items accept old and new wrappers and skip local, null, and episodes',()=>{
+  assert.deepEqual(playlistTracks([{track:rawTrack('one')},{item:rawTrack('two')},{item:rawTrack('one')},{item:null},{track:null},{item:{...rawTrack('local'),is_local:true}},{item:{name:'Podcast',type:'episode',uri:'spotify:episode:one'}}]).map(t=>t.name),['one','two','one']);
+  assert.deepEqual(playlistTracks(),[]);
+});
+test('playlist playback uses context and position offset or falls back to URI and queue',()=>{
+  const tracks=playlistTracks([{item:rawTrack('one')},{track:rawTrack('two')}]);
+  assert.deepEqual(playlistPlaybackBody(tracks[1],{uri:'spotify:playlist:mix'},tracks),{context_uri:'spotify:playlist:mix',offset:{position:1},position_ms:0});
+  assert.deepEqual(playlistPlaybackBody({...tracks[1],position:undefined},{uri:'spotify:playlist:mix'}),{context_uri:'spotify:playlist:mix',offset:{uri:'spotify:track:two'},position_ms:0});
+  assert.deepEqual(playlistPlaybackBody(tracks[1],{},tracks),playbackBody(tracks[1],tracks));
+  assert.throws(()=>playlistPlaybackBody(null,{uri:'spotify:playlist:mix'}),/cannot be played/);
+  assert.throws(()=>playlistPlaybackBody(null,null),/cannot be played/);
+});
+test('repeated playlist songs retain original positions across skipped episodes',()=>{
+  const tracks=playlistTracks([{item:rawTrack('one')},{item:{name:'Podcast',type:'episode',uri:'spotify:episode:one'}},{track:rawTrack('one')},{item:null},{item:rawTrack('two')}]);
+  assert.deepEqual(tracks.map(track=>[track.name,track.position]),[['one',0],['one',2],['two',4]]);
+  const playlist={uri:'spotify:playlist:mix'};
+  assert.deepEqual(playlistPlaybackBody(tracks[0],playlist).offset,{position:0});
+  assert.deepEqual(playlistPlaybackBody(tracks[1],playlist).offset,{position:2});
+});
+test('playlist API fetches with authorization and provides targeted permission and 404 errors',async()=>{
+  const client=clientFor(async(url,options)=>{
+    assert.equal(url,'https://api.spotify.com/v1/me/playlists?limit=50');
+    assert.equal(options.headers.Authorization,'Bearer test-access');
+    return response(200,{items:[],next:null});
+  });
+  assert.deepEqual(await client.api('/me/playlists?limit=50'),{items:[],next:null});
+  const denied=status=>clientFor(async url=>url.includes('/api/token')?response(200,{access_token:'new',expires_in:3600}):response(status));
+  for(const status of [401,403]) {
+    await assert.rejects(denied(status).api('/me/playlists?limit=50'),/Sign in again from Spotify Setup.*playlists/);
+    for(const endpoint of ['items','tracks']) {
+      await assert.rejects(denied(status).api('/playlists/mix/'+endpoint+'?limit=50'),status===403?/only shares songs from playlists you own or collaborate on.*sign in again from Spotify Setup/:/Sign in again from Spotify Setup.*playlists/);
+    }
+  }
+  await assert.rejects(clientFor(async()=>response(404)).api('/playlists/mix/items?limit=50'),error=>error.status===404);
 });
 test('clicking a song starts that URI at its actual queue offset',()=>{
   const tracks=uniqueTracks([rawTrack('one'),rawTrack('two')]);
@@ -132,6 +177,8 @@ test('PKCE roundtrip validates state and uses the original redirect URI',async()
   let sent;
   const client=clientFor(async(url,options)=>{sent=options.body;return response(200,{access_token:'new',refresh_token:'r',expires_in:3600});});
   const login=new URL(await client.login('a'.repeat(32),'https://player.test/'));
+  assert.ok(login.searchParams.get('scope').split(' ').includes('playlist-read-private'));
+  assert.ok(login.searchParams.get('scope').split(' ').includes('playlist-read-collaborative'));
   assert.equal(login.searchParams.get('code_challenge_method'),'S256');
   assert.equal(login.searchParams.get('code_challenge').length,43);
   assert.equal(login.searchParams.has('client_secret'),false);
