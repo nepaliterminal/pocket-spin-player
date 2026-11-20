@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { artwork, uniqueTracks, playbackBody, escapeHtml, formatTime, angleDelta, readJson } from '../dist/core.mjs';
-import { SpotifyClient } from '../dist/spotify.mjs';
+import { SpotifyClient, DEFAULT_CLIENT_ID } from '../dist/spotify.mjs';
 import { playerScale } from '../dist/fullscreen.mjs';
 
 const memory = (data={}) => ({getItem:key=>data[key]??null,setItem:(key,value)=>{data[key]=value;},removeItem:key=>{delete data[key];}});
@@ -100,4 +100,10 @@ test('PKCE roundtrip validates state and uses the original redirect URI',async()
   assert.equal(await client.callback('?code=test&state='+login.searchParams.get('state')),true);
   assert.equal(sent.get('redirect_uri'),'https://player.test/');
   assert.equal(client.token.access_token,'new');
+});
+
+test('client ID defaults to the built-in app but a saved ID overrides it',()=>{
+  assert.equal(new SpotifyClient({storage:memory(),session:memory()}).config.clientId,DEFAULT_CLIENT_ID);
+  assert.match(DEFAULT_CLIENT_ID,/^[a-f\d]{32}$/);
+  assert.equal(clientFor(()=>{}).config.clientId,'a'.repeat(32));
 });

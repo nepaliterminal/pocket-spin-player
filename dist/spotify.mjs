@@ -1,5 +1,6 @@
 import { readJson } from './core.mjs';
 
+export const DEFAULT_CLIENT_ID = '52465c9af39448d084401984ce00ec51';
 const CONFIG_KEY = 'pocket-spin-config-v1';
 const TOKEN_KEY = 'pocket-spin-token-v1';
 const SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-recently-played';
@@ -12,6 +13,7 @@ export class SpotifyClient {
   constructor({storage = localStorage, session = sessionStorage, request = fetch, now = Date.now} = {}) {
     this.storage = storage; this.session = session; this.request = request; this.now = now;
     this.config = readJson(storage, CONFIG_KEY, {});
+    if (!this.config?.clientId) this.config = {...this.config, clientId: DEFAULT_CLIENT_ID};
     this.token = readJson(storage, TOKEN_KEY, null);
     if (!this.token?.access_token) this.token = null;
     this.generation = 0; this.refreshing = null; this.retryAt = 0;
