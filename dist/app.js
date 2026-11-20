@@ -13,7 +13,7 @@ const demoTracks = [
 ];
 const menuItems = [
   ['Now Playing','now'], ['Recently Played','library'], ['Playlists','playlists'], ['Search Songs','search'],
-  ['Spotify Setup','settings'], ['Help','help'], ['About Pocket Spin','about']
+  ['Spotify Setup','settings'], ['Help','help']
 ];
 const state = {
   page:'home', cursor:0, stack:[], track:null, playing:false, position:0, updated:performance.now(),
@@ -72,7 +72,7 @@ const helpTopics=[
   ['Get your music','Go to Spotify Setup and press the center button to sign in. Playing needs Spotify Premium, and the music plays through the Spotify app on this phone.'],
   ['Find songs','Recently Played lists your latest songs, and Playlists has your playlists. In Search Songs, tap the box, type, then press Find.']
 ];
-const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'</div>';
+const helpView=()=>topbar('Help')+'<div class="screen-scroll connect help">'+helpTopics.map(([title,copy])=>'<h3>'+title+'</h3><p>'+copy+'</p>').join('')+'<h3>About</h3><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.3</p></div>';
 function render() {
   if(state.page==='now') screen.innerHTML=nowView();
   else if(state.page==='library') screen.innerHTML=libraryView();
