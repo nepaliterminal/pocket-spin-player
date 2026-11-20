@@ -53,7 +53,7 @@ function render() {
   else if(state.page==='library') screen.innerHTML=libraryView();
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
-  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Reliability edition · 1.1</p></div>';
+  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Fullscreen edition · 1.2</p></div>';
   else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
   if(state.page==='library'||state.page==='search') {
