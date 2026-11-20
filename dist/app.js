@@ -216,12 +216,13 @@ const remoteHint=()=>nativeApp
   ? (android.hasSpotifyApp()?'Open the Spotify app on this phone, then press Play in Pocket Spin.':'Install the Spotify app on this phone, then press Play in Pocket Spin.')
   : 'Open Spotify on any device, then press Play here.';
 // Spotify drops an idle phone from its device list, so a 404 means find the phone again (or open Spotify) and retry once.
-async function withDevice(command) {
+async function withDevice(command,retry=true) {
   try {return await command();}
   catch(error) {
     if(error.status!==404||!state.player?.remote) throw error;
     state.player=null;state.deviceId=null;
-    if(await connectRemote(state.epoch).catch(()=>false)) return command();
+    // A toggle is not repeated: the new device's state decides play or pause, which may reverse what was pressed.
+    if(await connectRemote(state.epoch).catch(()=>false)) {if(retry)return command();throw new Error('Found Spotify on this phone again. Press Play once more.');}
     if(nativeApp) {
       const installed=android.hasSpotifyApp();android.openSpotify();
       throw new Error(installed?'Spotify opened. Play any song there, then come back to Pocket Spin and press Play again.':'Install the Spotify app to play music, then press Play again.');
@@ -268,7 +269,7 @@ async function togglePlay() {
   }
   const ready=readyForPlayback();
   state.busy=true;
-  try {await ready;await withDevice(()=>state.player.togglePlay());state.position=position();state.updated=performance.now();state.playing=!state.playing;updateStatus();}
+  try {await ready;await withDevice(()=>state.player.togglePlay(),false);state.position=position();state.updated=performance.now();state.playing=!state.playing;updateStatus();}
   finally {state.busy=false;updateProgress();}
   settle();
 }
