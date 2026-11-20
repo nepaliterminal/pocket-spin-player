@@ -60,9 +60,9 @@ test('playlist API fetches with authorization and provides targeted permission a
   const denied=status=>clientFor(async url=>url.includes('/api/token')?response(200,{access_token:'new',expires_in:3600}):response(status));
   for(const status of [401,403]) {
     await assert.rejects(denied(status).api('/me/playlists?limit=50'),/Sign in again from Spotify Setup.*playlists/);
-    await assert.rejects(denied(status).api('/playlists/mix/items?limit=100'),/Sign in again from Spotify Setup.*playlists/);
+    await assert.rejects(denied(status).api('/playlists/mix/items?limit=50'),/Sign in again from Spotify Setup.*playlists/);
   }
-  await assert.rejects(clientFor(async()=>response(404)).api('/playlists/mix/items?limit=100'),error=>error.status===404);
+  await assert.rejects(clientFor(async()=>response(404)).api('/playlists/mix/items?limit=50'),error=>error.status===404);
 });
 test('clicking a song starts that URI at its actual queue offset',()=>{
   const tracks=uniqueTracks([rawTrack('one'),rawTrack('two')]);

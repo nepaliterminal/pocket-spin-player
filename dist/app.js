@@ -241,8 +241,8 @@ async function loadPlaylist() {
     else {
       const path='/playlists/'+encodeURIComponent(playlist.id);
       let rows;
-      try {rows=await playlistPages(path+'/items?limit=100',10000);}
-      catch(error){if(error.status!==404)throw error;rows=await playlistPages(path+'/tracks?limit=100',10000);}
+      try {rows=await playlistPages(path+'/items?limit=50',10000);}
+      catch(error){if(error.status!==404)throw error;rows=await playlistPages(path+'/tracks?limit=50',10000);}
       tracks=playlistTracks(rows);
     }
     if(epoch===state.epoch&&id===state.playlistRequest)state.playlistTracks=tracks;
