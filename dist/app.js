@@ -368,7 +368,7 @@ document.addEventListener('click',event=>{
   try {
     let result;
     if(action&&actions[action])result=actions[action]();
-    else if(target.dataset.page)result=go(target.dataset.page);
+    else if(target.dataset.page)result=target.dataset.page==='shuffle'?toggleShuffle():target.dataset.page==='repeat'?cycleRepeat():go(target.dataset.page);
     else if(target.dataset.track!==undefined){state.cursor=Number(target.dataset.track);result=select();}
     else if(target.dataset.playlist!==undefined){state.cursor=Number(target.dataset.playlist);result=select();}
     Promise.resolve(result).catch(report);
