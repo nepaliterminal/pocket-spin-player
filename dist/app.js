@@ -326,6 +326,7 @@ const wheel=$('#wheel');let lastAngle=null,wheelDelta=0;
 const angle=event=>{const r=wheel.getBoundingClientRect();return Math.atan2(event.clientY-r.top-r.height/2,event.clientX-r.left-r.width/2)*180/Math.PI;};
 wheel.addEventListener('pointerdown',event=>{
   if(event.target.closest('button')||event.button!==0||!event.isPrimary)return;
+  event.preventDefault();wheel.focus({preventScroll:true});
   wheel.setPointerCapture(event.pointerId);lastAngle=angle(event);
 });
 wheel.addEventListener('pointermove',event=>{
