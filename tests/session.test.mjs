@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import * as core from '../dist/core.mjs';
 import { SpotifyClient } from '../dist/spotify.mjs';
 
-test('automatic logout clears private app state and ignores pending SDK sync',async()=>{
+async function loadApp(globals={}) {
   const elements=new Map();
   const element=selector=>{
     if(!elements.has(selector))elements.set(selector,{
@@ -15,19 +15,37 @@ test('automatic logout clears private app state and ignores pending SDK sync',as
   };
   const storage=new Map();
   const localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)};
-  let disconnected=0,release;
-  const playback=new Promise(resolve=>{release=resolve;});
   const context=vm.createContext({
     ...core,esc:core.escapeHtml,localStorage,performance:{now:()=>0},
     document:{querySelector:element,addEventListener(){}},window:{addEventListener(){}},
-    setInterval(){},installFullscreen(){},
+    location:{origin:'https://example.com',pathname:'/'},setInterval(){},installFullscreen(){},
     SpotifyClient:class extends SpotifyClient {
       constructor(options){super({...options,storage:localStorage,session:localStorage,request:async()=>new Response('{}',{status:401})});}
     },
-    player:{disconnect(){disconnected++;},getCurrentState:()=>playback}
+    ...globals
   });
   const source=await readFile(new URL('../dist/app.js',import.meta.url),'utf8');
   vm.runInContext(source.replace(/^import .*;\n/gm,'').replace('boot().catch(report);',''),context);
+  return {element,context};
+}
+
+test('demo search offers Spotify Setup instead of an unusable form',async()=>{
+  const {element,context}=await loadApp();
+  vm.runInContext("go('search')",context);
+  assert.match(element('#screen').innerHTML,/data-action="settings"[^>]*>Spotify Setup/);
+  assert.doesNotMatch(element('#screen').innerHTML,/id="searchForm"/);
+  vm.runInContext('select()',context);
+  assert.match(element('#screen').innerHTML,/Sign in with Spotify/);
+  vm.runInContext('back(); actions.settings()',context);
+  assert.match(element('#screen').innerHTML,/Sign in with Spotify/);
+  vm.runInContext("client.saveToken({access_token:'test-token',expires_in:3600}); back()",context);
+  assert.match(element('#screen').innerHTML,/id="searchForm"/);
+});
+
+test('automatic logout clears private app state and ignores pending SDK sync',async()=>{
+  let disconnected=0,release;
+  const playback=new Promise(resolve=>{release=resolve;});
+  const {element,context}=await loadApp({player:{disconnect(){disconnected++;},getCurrentState:()=>playback}});
   vm.runInContext(`
     client.saveToken({access_token:'private-token',expires_in:3600});
     Object.assign(state,{page:'search',cursor:3,stack:[{page:'library',cursor:2}],player,deviceId:'device',active:true,

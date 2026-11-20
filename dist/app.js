@@ -48,7 +48,8 @@ function libraryView() {
   return topbar('Recently Played')+'<div class="screen-scroll">'+(state.loading?'<p class="empty">Loading recent songs…</p>':state.libraryError?'<p class="empty">'+esc(state.libraryError)+'</p>'+button('Try again','refresh'):tracks.length?trackRows(tracks):'<p class="empty">No recent tracks yet. Listen on Spotify, or search for a song.</p>')+'</div>';
 }
 function searchView() {
-  return topbar('Search Songs')+'<div class="search-view"><form id="searchForm"><input id="searchInput" aria-label="Search songs" placeholder="Song or artist" value="'+esc(state.query)+'" maxlength="200" required><button type="submit" '+(state.searching?'disabled':'')+'>Find</button></form><div class="search-results">'+(demo()?'<p class="empty">Connect Spotify in Setup to search.</p>':state.searching?'<p class="empty">Searching…</p>':trackRows(state.results)+(state.searched&&!state.results.length?'<p class="empty">No songs found.</p>':''))+'</div></div>';
+  if(demo()) return topbar('Search Songs')+'<div class="screen-scroll connect"><p>Connect Spotify to search for songs.</p>'+button('Spotify Setup','settings')+'</div>';
+  return topbar('Search Songs')+'<div class="search-view"><form id="searchForm"><input id="searchInput" aria-label="Search songs" placeholder="Song or artist" value="'+esc(state.query)+'" maxlength="200" required><button type="submit" '+(state.searching?'disabled':'')+'>Find</button></form><div class="search-results">'+(state.searching?'<p class="empty">Searching…</p>':trackRows(state.results)+(state.searched&&!state.results.length?'<p class="empty">No songs found.</p>':''))+'</div></div>';
 }
 function playlistsView() {
   return topbar('Playlists')+'<div class="screen-scroll">'+(state.playlistsLoading?'<p class="empty">Loading playlists…</p>':state.playlistsError?'<p class="empty">'+esc(state.playlistsError)+'</p>'+button('Try again','refreshPlaylists'):state.playlists.length?state.playlists.map((playlist,i)=>'<button type="button" class="library-row '+(i===state.cursor?'selected':'')+'" data-playlist="'+i+'">'+artwork(playlist,true)+'<span class="row-copy"><b>'+esc(playlist.name)+'</b><small>'+esc(playlist.owner)+'</small></span></button>').join(''):'<p class="empty">No playlists yet. Create or save a playlist on Spotify.</p>')+'</div>';
@@ -112,6 +113,7 @@ function back() { Object.assign(state,state.stack.pop()||{page:'home',cursor:0})
 function home() { state.page='home';state.cursor=0;state.stack=[];render(); }
 function select() {
   if(state.page==='home') return go(menuItems[state.cursor][1]);
+  if(state.page==='search'&&demo()) return go('settings');
   if(state.page==='library'||state.page==='search') return playTrack(items()[state.cursor],items());
   if(state.page==='playlists') {
     const playlist=items()[state.cursor];if(!playlist)return;
@@ -243,7 +245,7 @@ async function loadLibrary() {
   finally {if(epoch===state.epoch){state.loading=false;setPageCursor(state,'library',clamp(state.cursor,0,Math.max(0,state.library.length-1)));if(state.page==='library')render();}}
 }
 async function search() {
-  if(demo()) throw new Error('Connect Spotify from Setup to search.');
+  if(demo()) return;
   state.query=$('#searchInput').value.trim();if(!state.query)return;
   const id=++searchId, epoch=state.epoch;
   state.searching=true;state.searched=false;state.results=[];render();
@@ -291,7 +293,7 @@ function clearSession() {
 }
 function signout() { client.logout(); }
 const actions={menu:back,back,home,select,play:togglePlay,next:()=>skip(1),previous:()=>skip(-1),
-  library:()=>go('library'),refresh:loadLibrary,dismiss:()=>{state.error='';updateStatus();},
+  library:()=>go('library'),settings:()=>go('settings'),refresh:loadLibrary,dismiss:()=>{state.error='';updateStatus();},
   refreshPlaylists:loadPlaylists,refreshPlaylist:loadPlaylist,
   reconnect:()=>{disconnect();sdkFailed=false;return connectPlayer();},signout};
 // Direct click handlers preserve browser user activation for protected audio.
