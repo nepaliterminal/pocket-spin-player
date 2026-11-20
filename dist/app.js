@@ -5,7 +5,7 @@ import { installFullscreen } from './fullscreen.mjs';
 
 const $ = selector => document.querySelector(selector);
 const screen = $('#screen');
-const client = new SpotifyClient();
+const client = new SpotifyClient({onLogout:clearSession});
 const demoTracks = [
   {name:'Neon Gardens', artist:'Satellite Club', album:'Midnight Circuit', duration:247000},
   {name:'Sea Glass', artist:'Eleanor Hart', album:'Low Tide', duration:218000},
@@ -124,7 +124,13 @@ function applyPlayback(playback) {
   state.track=track;state.position=playback.position;state.updated=performance.now();state.playing=!playback.paused;state.active=true;
   if(changed&&state.page==='now') render(); else {updateStatus();updateProgress();}
 }
-async function sync() { if(state.player&&state.deviceId) applyPlayback(await state.player.getCurrentState()); }
+async function sync() {
+  const epoch=state.epoch;
+  if(state.player&&state.deviceId) {
+    const playback=await state.player.getCurrentState();
+    if(epoch===state.epoch) applyPlayback(playback);
+  }
+}
 function disconnect() {
   state.epoch++;state.player?.disconnect();state.player=null;state.deviceId=null;state.connecting=null;
   state.position=position();state.updated=performance.now();state.playing=false;state.active=false;
@@ -249,10 +255,11 @@ async function loadPlaylist() {
   }catch(error){if(epoch===state.epoch&&id===state.playlistRequest)state.playlistError=error.message;}
   finally {if(epoch===state.epoch&&id===state.playlistRequest){state.playlistLoading=false;setPageCursor(state,'playlist',clamp(state.cursor,0,Math.max(0,state.playlistTracks.length-1)));if(state.page==='playlist')render();}}
 }
-function signout() {
+function clearSession() {
   Object.assign(state,{playlists:[],playlistsLoaded:false,playlistsLoading:false,playlistsError:'',playlist:null,playlistTracks:[],playlistLoading:false,playlistError:''});
-  disconnect();client.logout();searchId++;state.library=[];state.results=[];state.track=null;state.query='';state.searched=false;state.searching=false;state.loading=false;state.error='';state.playerError='';home();
+  disconnect();searchId++;state.library=[];state.results=[];state.track=null;state.query='';state.searched=false;state.searching=false;state.loading=false;state.libraryError='';state.error='';state.playerError='';home();
 }
+function signout() { client.logout(); }
 const actions={menu:back,back,home,select,play:togglePlay,next:()=>skip(1),previous:()=>skip(-1),
   library:()=>go('library'),refresh:loadLibrary,dismiss:()=>{state.error='';updateStatus();},
   refreshPlaylists:loadPlaylists,refreshPlaylist:loadPlaylist,

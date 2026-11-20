@@ -7,10 +7,10 @@ import { playerScale } from '../dist/fullscreen.mjs';
 const memory = (data={}) => ({getItem:key=>data[key]??null,setItem:(key,value)=>{data[key]=value;},removeItem:key=>{delete data[key];}});
 const token = {access_token:'test-access',refresh_token:'test-refresh',expires_at:9999999};
 const response = (status,data={},headers={}) => new Response(status===204?null:JSON.stringify(data),{status,headers});
-const clientFor = (request, saved=token) => new SpotifyClient({storage:memory({
+const clientFor = (request, saved=token, onLogout) => new SpotifyClient({storage:memory({
   'pocket-spin-config-v1':JSON.stringify({clientId:'a'.repeat(32)}),
   'pocket-spin-token-v1':JSON.stringify(saved)
-}),session:memory(),request,now:()=>1000});
+}),session:memory(),request,now:()=>1000,onLogout});
 const rawTrack = (id, images=[]) => ({name:id,uri:'spotify:track:'+id,artists:[{name:'Artist'}],album:{name:'Album',images},duration_ms:100000});
 
 test('restored page cursor stays within a changed or empty list',()=>{
@@ -155,6 +155,46 @@ test('persistent unauthorized response signs out instead of looping',async()=>{
   let calls=0;
   const client=clientFor(async url=>{calls++;return url.includes('/api/token')?response(200,{access_token:'new',expires_in:3600}):response(401);});
   await assert.rejects(client.api('/me'),/session expired/);assert.equal(calls,3);assert.equal(client.token,null);
+});
+test('automatic logout invokes cleanup after clearing the saved session',async()=>{
+  for(const scenario of ['missing refresh token','refresh 400','refresh 401','persistent 401']) {
+    let cleanups=0;
+    const saved=scenario==='missing refresh token'?{...token,expires_at:0,refresh_token:null}:
+      scenario==='persistent 401'?token:{...token,expires_at:0};
+    const client=clientFor(async url=>url.includes('/api/token')?
+      response(scenario==='persistent 401'?200:Number(scenario.slice(-3)),{access_token:'new',expires_in:3600}):response(401),saved,()=>{
+      cleanups++;
+      assert.equal(client.token,null);
+      assert.equal(client.storage.getItem('pocket-spin-token-v1'),null);
+    });
+    await assert.rejects(client.api('/me'),/session expired|renew your Spotify session/);
+    assert.equal(cleanups,1,scenario);
+  }
+});
+test('explicit logout invokes cleanup once and works with empty storage',()=>{
+  for(const saved of [token,null]) {
+    let cleanups=0;
+    const client=clientFor(()=>{},saved,()=>{cleanups++;});
+    client.logout();
+    assert.equal(cleanups,1);
+    assert.equal(client.token,null);
+  }
+});
+test('throwing logout cleanup cannot mask a session error or retain tokens',async()=>{
+  const client=clientFor(async()=>response(401),token,()=>{throw new Error('cleanup failed');});
+  await assert.rejects(client.api('/me',{},false),/Your session expired/);
+  assert.equal(client.token,null);
+  assert.equal(client.storage.getItem('pocket-spin-token-v1'),null);
+  assert.doesNotThrow(()=>client.logout());
+});
+test('temporary refresh failures do not clear the session or invoke cleanup',async()=>{
+  for(const request of [async()=>response(503),async()=>{throw new TypeError('offline');}]) {
+    let cleanups=0;
+    const client=clientFor(request,{...token,expires_at:0},()=>{cleanups++;});
+    await assert.rejects(client.accessToken(),/renew your Spotify session|Check your connection/);
+    assert.equal(cleanups,0);
+    assert.ok(client.token);
+  }
 });
 test('429 waits for Retry-After without retry storms',async()=>{
   let calls=0;
