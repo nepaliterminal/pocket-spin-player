@@ -3,7 +3,7 @@ import { readJson } from './core.mjs';
 export const DEFAULT_CLIENT_ID = '52465c9af39448d084401984ce00ec51';
 const CONFIG_KEY = 'pocket-spin-config-v1';
 const TOKEN_KEY = 'pocket-spin-token-v1';
-const SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-recently-played';
+const SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-recently-played playlist-read-private playlist-read-collaborative';
 const SESSION_KEY = 'pocket-spin-oauth-v2';
 const base64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(48)));
@@ -66,6 +66,9 @@ export class SpotifyClient {
       ...options, headers:{...options.headers, Authorization:`Bearer ${access}`}
     });
     if (generation !== this.generation) throw new Error('Session changed.');
+    const playlistPath = /^\/(me\/playlists|playlists\/)/.test(path);
+    if (playlistPath && [401, 403].includes(response.status)) throw new Error('Sign in again from Spotify Setup to allow access to your playlists.');
+    if (playlistPath && response.status === 404) throw Object.assign(new Error('This playlist is not available. Please try again.'), {status:404});
     if (response.status === 401 && retry) { await this.accessToken(true); return this.api(path, options, false); }
     if (response.status === 429) {
       const delay = Number(response.headers.get('Retry-After')) || 30;

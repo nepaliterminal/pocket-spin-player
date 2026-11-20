@@ -17,10 +17,23 @@ export function trackFrom(raw) {
 }
 export function uniqueTracks(items = []) {
   const seen = new Set();
-  return items.map(i => trackFrom(i?.track || i)).filter(t => {
+  return items.map(i => trackFrom(i && 'item' in i ? i.item : i?.track || i)).filter(t => {
     if (!t || !t.uri || seen.has(t.uri)) return false;
     seen.add(t.uri); return true;
   });
+}
+export function playlistFrom(raw) {
+  if (!raw?.id) return null;
+  return {id:raw.id, name:raw.name || 'Untitled playlist', owner:raw.owner?.display_name || raw.owner?.id || 'Unknown owner',
+    image:artwork(raw.images), uri:raw.uri || '', total:raw.items?.total ?? raw.tracks?.total ?? 0};
+}
+export function playlistTracks(items = []) {
+  return uniqueTracks(items).filter(track => track.playable);
+}
+export function playlistPlaybackBody(track, playlist, queue = []) {
+  if (!playlist?.uri) return playbackBody(track, queue);
+  if (!track?.playable) throw new Error('This track cannot be played here. Choose another song.');
+  return {context_uri:playlist.uri, offset:{uri:track.uri}, position_ms:0};
 }
 export function playbackBody(track, queue = []) {
   if (!track?.playable) throw new Error('This track cannot be played here. Choose another song.');

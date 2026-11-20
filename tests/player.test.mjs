@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { artwork, uniqueTracks, playbackBody, escapeHtml, formatTime, angleDelta, readJson } from '../dist/core.mjs';
+import { artwork, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, escapeHtml, formatTime, angleDelta, readJson } from '../dist/core.mjs';
 import { SpotifyClient, DEFAULT_CLIENT_ID } from '../dist/spotify.mjs';
 import { playerScale } from '../dist/fullscreen.mjs';
 
@@ -30,6 +30,38 @@ test('artwork chooses full resolution regardless of API array order',()=>{
 });
 test('recent library deduplicates and tolerates unavailable tracks',()=>{
   assert.deepEqual(uniqueTracks([{track:rawTrack('one')},{track:null},{track:rawTrack('one')},{track:rawTrack('two')}]).map(t=>t.name),['one','two']);
+});
+test('playlists normalize metadata and tolerate missing values',()=>{
+  assert.equal(playlistFrom(null),null);
+  assert.equal(playlistFrom({name:'Missing id'}),null);
+  assert.deepEqual(playlistFrom({id:'mix',name:'Mix',owner:{display_name:'DJ'},images:[{url:'https://images.test/mix'}],uri:'spotify:playlist:mix',tracks:{total:3}}),
+    {id:'mix',name:'Mix',owner:'DJ',image:'https://images.test/mix',uri:'spotify:playlist:mix',total:3});
+  assert.equal(playlistFrom({id:'empty',items:{total:0}}).total,0);
+  assert.equal(playlistFrom({id:'empty'}).owner,'Unknown owner');
+});
+test('playlist items accept old and new wrappers and skip local, null, and episodes',()=>{
+  assert.deepEqual(playlistTracks([{track:rawTrack('one')},{item:rawTrack('two')},{item:rawTrack('one')},{item:null},{track:null},{item:{...rawTrack('local'),is_local:true}},{item:{name:'Podcast',type:'episode',uri:'spotify:episode:one'}}]).map(t=>t.name),['one','two']);
+  assert.deepEqual(playlistTracks(),[]);
+});
+test('playlist playback uses context and URI offset or falls back to the queue',()=>{
+  const tracks=playlistTracks([{item:rawTrack('one')},{track:rawTrack('two')}]);
+  assert.deepEqual(playlistPlaybackBody(tracks[1],{uri:'spotify:playlist:mix'},tracks),{context_uri:'spotify:playlist:mix',offset:{uri:'spotify:track:two'},position_ms:0});
+  assert.deepEqual(playlistPlaybackBody(tracks[1],{},tracks),playbackBody(tracks[1],tracks));
+  assert.throws(()=>playlistPlaybackBody(null,{uri:'spotify:playlist:mix'}),/cannot be played/);
+  assert.throws(()=>playlistPlaybackBody(null,null),/cannot be played/);
+});
+test('playlist API fetches with authorization and provides targeted permission and 404 errors',async()=>{
+  const client=clientFor(async(url,options)=>{
+    assert.equal(url,'https://api.spotify.com/v1/me/playlists?limit=50');
+    assert.equal(options.headers.Authorization,'Bearer test-access');
+    return response(200,{items:[],next:null});
+  });
+  assert.deepEqual(await client.api('/me/playlists?limit=50'),{items:[],next:null});
+  for(const status of [401,403]) {
+    await assert.rejects(clientFor(async()=>response(status)).api('/me/playlists?limit=50'),/Sign in again from Spotify Setup.*playlists/);
+    await assert.rejects(clientFor(async()=>response(status)).api('/playlists/mix/items?limit=100'),/Sign in again from Spotify Setup.*playlists/);
+  }
+  await assert.rejects(clientFor(async()=>response(404)).api('/playlists/mix/items?limit=100'),error=>error.status===404);
 });
 test('clicking a song starts that URI at its actual queue offset',()=>{
   const tracks=uniqueTracks([rawTrack('one'),rawTrack('two')]);
@@ -94,6 +126,8 @@ test('PKCE roundtrip validates state and uses the original redirect URI',async()
   let sent;
   const client=clientFor(async(url,options)=>{sent=options.body;return response(200,{access_token:'new',refresh_token:'r',expires_in:3600});});
   const login=new URL(await client.login('a'.repeat(32),'https://player.test/'));
+  assert.ok(login.searchParams.get('scope').split(' ').includes('playlist-read-private'));
+  assert.ok(login.searchParams.get('scope').split(' ').includes('playlist-read-collaborative'));
   assert.equal(login.searchParams.get('code_challenge_method'),'S256');
   assert.equal(login.searchParams.get('code_challenge').length,43);
   assert.equal(login.searchParams.has('client_secret'),false);

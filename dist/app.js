@@ -1,5 +1,5 @@
 /* Pocket Spin: browser-only PKCE. Never put a client secret in this app. */
-import { clamp, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, formatTime, angleDelta } from './core.mjs';
+import { clamp, escapeHtml as esc, readJson, trackFrom, uniqueTracks, playbackBody, playlistFrom, playlistTracks, playlistPlaybackBody, formatTime, angleDelta } from './core.mjs';
 import { SpotifyClient, loadSdk } from './spotify.mjs';
 import { installFullscreen } from './fullscreen.mjs';
 
@@ -12,13 +12,15 @@ const demoTracks = [
   {name:'Slow Motion', artist:'Garden Club', album:'Lemon Season', duration:196000}
 ];
 const menuItems = [
-  ['Now Playing','now'], ['Recently Played','library'], ['Search Songs','search'],
+  ['Now Playing','now'], ['Recently Played','library'], ['Playlists','playlists'], ['Search Songs','search'],
   ['Spotify Setup','settings'], ['About Pocket Spin','about']
 ];
 const state = {
   page:'home', cursor:0, stack:[], track:null, playing:false, position:0, updated:performance.now(),
   player:null, deviceId:null, active:false, connecting:null, busy:false, epoch:0,
   library:[], loading:false, libraryError:'', results:[], query:'', searched:false, searching:false,
+  playlists:[], playlistsLoaded:false, playlistsLoading:false, playlistsError:'', playlist:null,
+  playlistTracks:[], playlistLoading:false, playlistError:'', playlistRequest:0,
   error:'', playerError:'', volume:clamp(readJson(localStorage,'pocket-spin-volume',0.6),0,1)
 };
 let searchId = 0;
@@ -45,18 +47,26 @@ function libraryView() {
 function searchView() {
   return topbar('Search Songs')+'<div class="search-view"><form id="searchForm"><input id="searchInput" aria-label="Search songs" placeholder="Song or artist" value="'+esc(state.query)+'" maxlength="200" required><button type="submit" '+(state.searching?'disabled':'')+'>Find</button></form><div class="search-results">'+(demo()?'<p class="empty">Connect Spotify in Setup to search.</p>':state.searching?'<p class="empty">Searching…</p>':trackRows(state.results)+(state.searched&&!state.results.length?'<p class="empty">No songs found.</p>':''))+'</div></div>';
 }
+function playlistsView() {
+  return topbar('Playlists')+'<div class="screen-scroll">'+(state.playlistsLoading?'<p class="empty">Loading playlists…</p>':state.playlistsError?'<p class="empty">'+esc(state.playlistsError)+'</p>'+button('Try again','refreshPlaylists'):state.playlists.length?state.playlists.map((playlist,i)=>'<button type="button" class="library-row '+(i===state.cursor?'selected':'')+'" data-playlist="'+i+'">'+artwork(playlist,true)+'<span class="row-copy"><b>'+esc(playlist.name)+'</b><small>'+esc(playlist.owner)+'</small></span></button>').join(''):'<p class="empty">No playlists yet. Create or save a playlist on Spotify.</p>')+'</div>';
+}
+function playlistView() {
+  return topbar(state.playlist?.name || 'Playlist')+'<div class="screen-scroll">'+(state.playlistLoading?'<p class="empty">Loading songs…</p>':state.playlistError?'<p class="empty">'+esc(state.playlistError)+'</p>'+button('Try again','refreshPlaylist'):state.playlistTracks.length?trackRows(state.playlistTracks):'<p class="empty">No playable songs in this playlist.</p>')+'</div>';
+}
 function settingsView() {
   return topbar('Spotify Setup')+'<div class="screen-scroll connect"><p>Use your Spotify app’s Client ID. Never enter a client secret.</p><form id="loginForm"><label for="clientId">Client ID</label><input class="field" id="clientId" value="'+esc(client.config.clientId||'')+'" placeholder="32-character Client ID" autocomplete="off" spellcheck="false" required><label for="redirect">Redirect URL (exact match)</label><input class="field" id="redirect" readonly value="'+esc(redirect())+'"><button class="screen-action" type="submit">'+(demo()?'Sign in with Spotify':'Sign in again')+'</button></form>'+(demo()?'':button('Reconnect audio player','reconnect')+button('Sign out on this browser','signout'))+'<label for="volume">Volume</label><input id="volume" aria-label="Volume" type="range" min="0" max="100" value="'+Math.round(state.volume*100)+'"><p class="legal">Browser playback requires Spotify Premium. Development apps must allow your account in their dashboard. Select Web API and Web Playback SDK. Allow protected-content playback in your browser.</p></div>';
 }
 function render() {
   if(state.page==='now') screen.innerHTML=nowView();
   else if(state.page==='library') screen.innerHTML=libraryView();
+  else if(state.page==='playlists') screen.innerHTML=playlistsView();
+  else if(state.page==='playlist') screen.innerHTML=playlistView();
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
   else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Reliability edition · 1.1</p></div>';
   else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
-  if(state.page==='library'||state.page==='search') {
+  if(['library','search','playlists','playlist'].includes(state.page)) {
     const selected=screen.querySelector('.selected');
     if(selected) selected.scrollIntoView({block:'nearest'});
   }
@@ -82,7 +92,7 @@ function notify(message) {
   const toast=$('#toast'); toast.textContent=message; toast.classList.add('show');
   clearTimeout(notify.timer); notify.timer=setTimeout(()=>toast.classList.remove('show'),3500);
 }
-function items() { return state.page==='home'?menuItems:state.page==='library'?(demo()?demoTracks:state.library):state.page==='search'?state.results:[]; }
+function items() { return state.page==='home'?menuItems:state.page==='library'?(demo()?demoTracks:state.library):state.page==='search'?state.results:state.page==='playlists'?state.playlistsLoading||state.playlistsError?[]:state.playlists:state.page==='playlist'?state.playlistLoading||state.playlistError?[]:state.playlistTracks:[]; }
 function move(delta) {
   const list=items(); if(!list.length) return;
   state.cursor=(state.cursor+delta+list.length)%list.length; render();
@@ -92,12 +102,18 @@ function go(page) {
   state.stack.push({page:state.page,cursor:state.cursor}); state.page=page; state.cursor=0;
   if(page==='now'&&demo()&&!state.track) state.track=demoTracks[0];
   render();
+  if(page==='playlists'&&!state.playlistsLoaded&&!state.playlistsLoading) run(loadPlaylists);
 }
 function back() { Object.assign(state,state.stack.pop()||{page:'home',cursor:0}); render(); }
 function home() { state.page='home';state.cursor=0;state.stack=[];render(); }
 function select() {
   if(state.page==='home') return go(menuItems[state.cursor][1]);
   if(state.page==='library'||state.page==='search') return playTrack(items()[state.cursor],items());
+  if(state.page==='playlists') {
+    const playlist=items()[state.cursor];if(!playlist)return;
+    state.playlist=playlist;state.playlistTracks=[];state.playlistError='';go('playlist');return loadPlaylist();
+  }
+  if(state.page==='playlist') return playTrack(items()[state.cursor],items(),state.playlist);
   if(state.page==='now') return togglePlay();
 }
 function applyPlayback(playback) {
@@ -149,7 +165,7 @@ async function readyForPlayback() {
   if(activation) await activation;
   if(!state.deviceId) {await connectPlayer();throw new Error('Audio player is ready. Press Play once more to start.');}
 }
-async function playTrack(track,queue=[]) {
+async function playTrack(track,queue=[],playlist=null) {
   if(!track||state.busy) return;
   if(demo()) {
     state.track=track;state.position=0;state.updated=performance.now();state.playing=true;go('now');render();return;
@@ -158,7 +174,7 @@ async function playTrack(track,queue=[]) {
   state.busy=true;state.error='';updateStatus();updateProgress();
   try {
     await ready;
-    await client.api('/me/player/play?device_id='+encodeURIComponent(state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playbackBody(track,queue))});
+    await client.api('/me/player/play?device_id='+encodeURIComponent(state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playlist?playlistPlaybackBody(track,playlist,queue):playbackBody(track,queue))});
     state.track=track;state.position=0;state.updated=performance.now();go('now');render();await sync();
   } finally {state.busy=false;updateProgress();}
 }
@@ -198,11 +214,48 @@ async function search() {
   try {const data=await client.api('/search?type=track&limit=10&q='+encodeURIComponent(state.query));if(id===searchId&&epoch===state.epoch){state.results=uniqueTracks(data.tracks?.items);state.searched=true;state.cursor=0;}}
   finally {if(id===searchId&&epoch===state.epoch){state.searching=false;if(state.page==='search')render();}}
 }
+async function playlistPages(path, limit) {
+  const rows=[];
+  while(path&&rows.length<limit) {
+    const data=await client.api(path);rows.push(...(data.items || []));
+    path=data.next?new URL(data.next,'https://api.spotify.com').pathname.replace(/^\/v1/,'')+new URL(data.next,'https://api.spotify.com').search:null;
+  }
+  return rows.slice(0,limit);
+}
+async function loadPlaylists() {
+  const epoch=state.epoch;state.playlistsLoading=true;state.playlistsError='';
+  if(state.page==='playlists')render();
+  try {
+    const playlists=demo()?[{id:'demo',name:'Pocket Spin Mix',owner:'Pocket Spin',uri:'',total:demoTracks.length}]: (await playlistPages('/me/playlists?limit=50',200)).map(playlistFrom).filter(Boolean);
+    if(epoch===state.epoch){state.playlists=playlists;state.playlistsLoaded=true;}
+  } catch(error){if(epoch===state.epoch)state.playlistsError=error.message;}
+  finally {if(epoch===state.epoch){state.playlistsLoading=false;if(state.page==='playlists'){state.cursor=clamp(state.cursor,0,Math.max(0,state.playlists.length-1));render();}}}
+}
+async function loadPlaylist() {
+  const epoch=state.epoch, id=++state.playlistRequest, playlist=state.playlist;
+  if(!playlist)return;
+  state.playlistLoading=true;state.playlistError='';if(state.page==='playlist')render();
+  try {
+    let tracks;
+    if(demo()) tracks=demoTracks;
+    else {
+      const path='/playlists/'+encodeURIComponent(playlist.id);
+      let rows;
+      try {rows=await playlistPages(path+'/items?limit=100',10000);}
+      catch(error){if(error.status!==404)throw error;rows=await playlistPages(path+'/tracks?limit=100',10000);}
+      tracks=playlistTracks(rows);
+    }
+    if(epoch===state.epoch&&id===state.playlistRequest)state.playlistTracks=tracks;
+  }catch(error){if(epoch===state.epoch&&id===state.playlistRequest)state.playlistError=error.message;}
+  finally {if(epoch===state.epoch&&id===state.playlistRequest){state.playlistLoading=false;if(state.page==='playlist'){state.cursor=clamp(state.cursor,0,Math.max(0,state.playlistTracks.length-1));render();}}}
+}
 function signout() {
+  Object.assign(state,{playlists:[],playlistsLoaded:false,playlistsLoading:false,playlistsError:'',playlist:null,playlistTracks:[],playlistLoading:false,playlistError:''});
   disconnect();client.logout();searchId++;state.library=[];state.results=[];state.track=null;state.query='';state.searched=false;state.searching=false;state.loading=false;state.error='';state.playerError='';home();
 }
 const actions={menu:back,back,home,select,play:togglePlay,next:()=>skip(1),previous:()=>skip(-1),
   library:()=>go('library'),refresh:loadLibrary,dismiss:()=>{state.error='';updateStatus();},
+  refreshPlaylists:loadPlaylists,refreshPlaylist:loadPlaylist,
   reconnect:()=>{disconnect();return connectPlayer();},signout};
 // Direct click handlers preserve browser user activation for protected audio.
 document.addEventListener('click',event=>{
@@ -213,6 +266,7 @@ document.addEventListener('click',event=>{
     if(action&&actions[action])result=actions[action]();
     else if(target.dataset.page)result=go(target.dataset.page);
     else if(target.dataset.track!==undefined){state.cursor=Number(target.dataset.track);result=select();}
+    else if(target.dataset.playlist!==undefined){state.cursor=Number(target.dataset.playlist);result=select();}
     Promise.resolve(result).catch(report);
   }catch(error){report(error);}
 });

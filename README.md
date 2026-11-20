@@ -7,7 +7,7 @@ A nostalgic iPod Classic-inspired Spotify player for the browser. It pairs a tac
 - Fully keyboard-accessible click wheel with menus, play/pause, and track skipping
 - A silent offline preview (demo mode does not stream audio)
 - Spotify sign-in with Authorization Code + PKCE — no client secret is stored in the app
-- Recently played tracks, song search, and highest-resolution available album artwork
+- Recently played tracks, Playlists (including private and collaborative playlists), song search, and highest-resolution available album artwork
 - An in-browser Spotify Connect device via the Web Playback SDK
 - Play/pause, actual selected-track playback, skipping, seeking, and volume
 - Recoverable Spotify errors, refresh-token renewal, and rate-limit handling
@@ -40,6 +40,8 @@ Open `http://127.0.0.1:4173/`.
 4. In Pocket Spin, open **Spotify Setup**, paste the app's Client ID, then select **Sign in with Spotify**.
 
 Spotify's Web Playback SDK requires a Premium account. Development Mode apps also have Spotify-imposed user and endpoint limits.
+
+Open **Playlists** to browse your Spotify playlists and play songs in playlist order. Existing signed-in users must **sign in again** once from **Spotify Setup** to allow playlist access. Demo mode includes a silent sample playlist.
 
 MENU goes back one screen; **Home menu** always returns to the main menu. Use the wheel, arrow keys, or clickable rows to browse. Center selects; the bottom wheel button or Space plays/pauses. Settings and long lists scroll inside the screen. Spotify playback state updates never replace a form you are typing in.
 
