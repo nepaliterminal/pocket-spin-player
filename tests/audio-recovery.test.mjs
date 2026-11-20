@@ -36,7 +36,7 @@ test('unavailable SDK playback gives recovery instructions for the current platf
 });
 
 test('SDK errors after readiness remain visible',async()=>{
-  const {context,callbacks,fallback}=await loadApp(false,'ready');
+  const {context,callbacks,fallback}=await loadApp(undefined,'ready');
   await vm.runInContext('connectPlayer()',context);
   callbacks.authentication_error();
   assert.match(vm.runInContext('state.error',context),/Sign in again/);

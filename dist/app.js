@@ -23,9 +23,11 @@ const state = {
   playlistTracks:[], playlistLoading:false, playlistError:'', playlistRequest:0,
   error:'', playerError:'', volume:clamp(readJson(localStorage,'pocket-spin-volume',0.6),0,1)
 };
-let searchId = 0, sdkFailed = false;
+let searchId = 0;
 const android = window.PocketSpinAndroid;
 const nativeApp = !!android?.isApp?.();
+// Spotify's Web Playback SDK does not support Android, so the app always plays through the phone's Spotify app.
+let sdkFailed = nativeApp;
 document.body?.classList.toggle('native-app', nativeApp);
 const demo = () => !client.token;
 const redirect = () => location.origin + location.pathname;
@@ -68,7 +70,7 @@ function render() {
   else if(state.page==='playlist') screen.innerHTML=playlistView();
   else if(state.page==='search') screen.innerHTML=searchView();
   else if(state.page==='settings') screen.innerHTML=settingsView();
-  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.0</p></div>';
+  else if(state.page==='about') screen.innerHTML=topbar('About')+'<div class="screen-scroll connect"><h2>Pocket Spin</h2><p>A classic wheel for your Spotify music.</p><p>Drag around the wheel or use the arrow keys to browse. Center selects. MENU goes back. The bottom button plays or pauses.</p><p>Demo mode is a silent preview. Not affiliated with Apple or Spotify.</p><p>Version 2.1</p></div>';
   else screen.innerHTML=topbar('Music')+'<div class="screen-title">Music</div><div class="menu-list">'+menuItems.map(([label,page],i)=>'<button type="button" data-page="'+page+'" class="menu-item '+(i===state.cursor?'selected':'')+'">'+label+'</button>').join('')+'</div>';
   updateStatus(); updateProgress();
   if(['library','search','playlists','playlist'].includes(state.page)) {
@@ -130,6 +132,11 @@ function applyPlayback(playback) {
   state.track=track;state.position=playback.position;state.updated=performance.now();state.playing=!playback.paused;state.active=true;
   if(changed&&state.page==='now') render(); else {updateStatus();updateProgress();}
 }
+// Refresh after a command without holding the wheel; Spotify Connect needs a moment to report the change.
+function settle() {
+  const wait=state.player?.remote?700:0;
+  setTimeout(()=>{if(!syncing){syncing=true;sync().catch(()=>{}).finally(()=>{syncing=false;});}},wait);
+}
 async function sync() {
   const epoch=state.epoch;
   if(state.player&&state.deviceId) {
@@ -186,7 +193,7 @@ async function connectPlayer() {
   finally {if(state.connecting===task)state.connecting=null;}
 }
 async function connectRemote(epoch) {
-  const remote=await remotePlayer(client);
+  const remote=await remotePlayer(client,{phoneOnly:nativeApp,model:nativeApp?String(android.deviceModel?.()||''):''});
   if(!remote||epoch!==state.epoch) return false;
   state.player=remote;state.deviceId=remote.deviceId;state.playerError='';state.error='';
   notify('Playing through Spotify on '+remote.name+'.');updateStatus();
@@ -219,9 +226,10 @@ async function playTrack(track,queue=[],playlist=null) {
   state.busy=true;state.error='';updateStatus();updateProgress();
   try {
     await ready;
-    await client.api('/me/player/play?device_id='+encodeURIComponent(state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playlist?playlistPlaybackBody(track,playlist,queue):playbackBody(track,queue))});
-    state.track=track;state.position=0;state.updated=performance.now();go('now');render();await sync();
+    await client.api('/me/player/play?device_id='+encodeURIComponent(state.player?.target?.()||state.deviceId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(playlist?playlistPlaybackBody(track,playlist,queue):playbackBody(track,queue))});
+    state.track=track;state.position=0;state.updated=performance.now();state.playing=true;state.active=true;go('now');render();
   } finally {state.busy=false;updateProgress();}
+  settle();
 }
 async function togglePlay() {
   if(state.busy) return;
@@ -233,7 +241,9 @@ async function togglePlay() {
   }
   const ready=readyForPlayback();
   state.busy=true;
-  try {await ready;await state.player.togglePlay();await sync();} finally {state.busy=false;updateProgress();}
+  try {await ready;await state.player.togglePlay();state.position=position();state.updated=performance.now();state.playing=!state.playing;updateStatus();}
+  finally {state.busy=false;updateProgress();}
+  settle();
 }
 async function skip(direction) {
   if(state.busy) return;
@@ -241,7 +251,8 @@ async function skip(direction) {
   await readyForPlayback();
   if(!state.active) return togglePlay();
   state.busy=true;
-  try {await state.player[direction>0?'nextTrack':'previousTrack']();await sync();}finally{state.busy=false;updateProgress();}
+  try {await state.player[direction>0?'nextTrack':'previousTrack']();}finally{state.busy=false;updateProgress();}
+  settle();
 }
 async function loadLibrary() {
   if(demo()) return;
@@ -302,7 +313,7 @@ function signout() { client.logout(); }
 const actions={menu:back,back,home,select,play:togglePlay,next:()=>skip(1),previous:()=>skip(-1),
   library:()=>go('library'),settings:()=>go('settings'),refresh:loadLibrary,dismiss:()=>{state.error='';updateStatus();},
   refreshPlaylists:loadPlaylists,refreshPlaylist:loadPlaylist,
-  reconnect:()=>{disconnect();sdkFailed=false;return connectPlayer();},signout};
+  reconnect:()=>{disconnect();sdkFailed=nativeApp;return connectPlayer();},signout};
 // Direct click handlers preserve browser user activation for protected audio.
 document.addEventListener('click',event=>{
   const target=event.target.closest('button');if(!target)return;

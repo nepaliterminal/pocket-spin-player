@@ -82,7 +82,9 @@ export class SpotifyClient {
     if (response.status === 401) { this.logout(); throw new Error('Your session expired. Please sign in again from Setup.'); }
     if (response.status === 404) throw new Error('The Spotify player is not available yet. Reconnect the player in Setup.');
     if (!response.ok) throw new Error(`Spotify could not complete that request (${response.status}). Please try again.`);
-    return response.status === 204 ? null : response.json();
+    // Player commands can answer 200 with a non-JSON body, so an unreadable body counts as empty.
+    const body = await response.text();
+    try { return body ? JSON.parse(body) : null; } catch { return null; }
   }
   async login(clientId, redirect) {
     if (!/^[a-f\d]{32}$/i.test(clientId)) throw new Error('Enter the 32-character Client ID from your Spotify app settings.');
@@ -130,8 +132,8 @@ export function loadSdk() {
 }
 
 // Controls the Spotify app (or another Connect device) through the Web API when in-app audio is unavailable.
-export async function remotePlayer(client) {
-  const device = pickDevice((await client.api('/me/player/devices'))?.devices);
+export async function remotePlayer(client, options) {
+  const device = pickDevice((await client.api('/me/player/devices'))?.devices, options);
   if (!device) return null;
   let target = device.id, playing = false;
   const id = () => encodeURIComponent(target);
@@ -143,8 +145,9 @@ export async function remotePlayer(client) {
     playing = !!state && !state.paused;
     return state;
   };
-  return {remote:true, deviceId:device.id, name:device.name,
-    togglePlay:async () => { await getCurrentState(); await client.api(`/me/player/${playing ? 'pause' : 'play'}?device_id=${id()}`, {method:'PUT'}); },
+  await getCurrentState();
+  return {remote:true, deviceId:device.id, name:device.name, target:() => target,
+    togglePlay:async () => { await client.api(`/me/player/${playing ? 'pause' : 'play'}?device_id=${id()}`, {method:'PUT'}); playing = !playing; },
     nextTrack:() => client.api(`/me/player/next?device_id=${id()}`, {method:'POST'}),
     previousTrack:() => client.api(`/me/player/previous?device_id=${id()}`, {method:'POST'}),
     seek:ms => client.api(`/me/player/seek?position_ms=${Math.round(ms)}&device_id=${id()}`, {method:'PUT'}),

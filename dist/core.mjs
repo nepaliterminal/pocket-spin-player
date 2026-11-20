@@ -59,8 +59,14 @@ export function formatTime(ms) {
 export function angleDelta(from, to) {
   return ((to - from + 540) % 360) - 180;
 }
-export function pickDevice(devices = [], skipName = 'Pocket Spin') {
+// phoneOnly (the Android app) never picks a computer or speaker: music should play on the phone in hand.
+export function pickDevice(devices = [], {skipName = 'Pocket Spin', phoneOnly = false, model = ''} = {}) {
   const usable = (devices || []).filter(d => d?.id && !d.is_restricted && d.name !== skipName);
+  if (phoneOnly) {
+    const phones = usable.filter(d => d.type === 'Smartphone');
+    const own = model && phones.find(d => d.name?.toLowerCase().includes(model.toLowerCase()));
+    return own || phones.find(d => d.is_active) || phones[0] || null;
+  }
   return usable.find(d => d.is_active) || usable.find(d => d.type === 'Smartphone') || usable[0] || null;
 }
 export function remoteState(playback) {
