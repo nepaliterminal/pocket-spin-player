@@ -253,17 +253,20 @@ test('remote playback state maps to the in-app player shape',()=>{
   assert.deepEqual([state.paused,state.position,state.duration,state.track_window.current_track.name],[true,5000,100000,'x']);
 });
 test('remote player controls the chosen Spotify device through the Web API',async()=>{
-  const calls=[];
+  const calls=[],playback={is_playing:true,progress_ms:1,item:rawTrack('x')};
   const client=clientFor(async(url,options)=>{
     calls.push((options.method||'GET')+' '+url.replace('https://api.spotify.com/v1',''));
     if(url.endsWith('/me/player/devices')) return response(200,{devices:[{id:'phone 1',name:'Pixel',type:'Smartphone'}]});
-    if(url.endsWith('/me/player')) return response(200,{is_playing:true,progress_ms:1,item:rawTrack('x')});
+    if(url.endsWith('/me/player')) return response(200,playback);
     return response(204);
   });
   const remote=await remotePlayer(client);
   assert.equal(remote.deviceId,'phone 1');
   await remote.togglePlay();await remote.nextTrack();await remote.seek(1500.4);
   assert.deepEqual(calls.slice(1),['GET /me/player','PUT /me/player/pause?device_id=phone%201','POST /me/player/next?device_id=phone%201','PUT /me/player/seek?position_ms=1500&device_id=phone%201']);
+  playback.device={id:'tv 2'};calls.length=0;
+  await remote.getCurrentState();await remote.nextTrack();
+  assert.deepEqual(calls,['GET /me/player','POST /me/player/next?device_id=tv%202']);
   const none=clientFor(async()=>response(200,{devices:[]}));
   assert.equal(await remotePlayer(none),null);
 });

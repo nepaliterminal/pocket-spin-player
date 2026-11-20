@@ -133,18 +133,21 @@ export function loadSdk() {
 export async function remotePlayer(client) {
   const device = pickDevice((await client.api('/me/player/devices'))?.devices);
   if (!device) return null;
-  const id = encodeURIComponent(device.id);
-  let playing = false;
+  let target = device.id, playing = false;
+  const id = () => encodeURIComponent(target);
+  // Follow playback when the user moves it to another device, so controls act on the song shown.
   const getCurrentState = async () => {
-    const state = remoteState(await client.api('/me/player'));
+    const playback = await client.api('/me/player');
+    if (playback?.device?.id) target = playback.device.id;
+    const state = remoteState(playback);
     playing = !!state && !state.paused;
     return state;
   };
   return {remote:true, deviceId:device.id, name:device.name,
-    togglePlay:async () => { await getCurrentState(); await client.api(`/me/player/${playing ? 'pause' : 'play'}?device_id=${id}`, {method:'PUT'}); },
-    nextTrack:() => client.api(`/me/player/next?device_id=${id}`, {method:'POST'}),
-    previousTrack:() => client.api(`/me/player/previous?device_id=${id}`, {method:'POST'}),
-    seek:ms => client.api(`/me/player/seek?position_ms=${Math.round(ms)}&device_id=${id}`, {method:'PUT'}),
-    setVolume:level => client.api(`/me/player/volume?volume_percent=${Math.round(level * 100)}&device_id=${id}`, {method:'PUT'}),
+    togglePlay:async () => { await getCurrentState(); await client.api(`/me/player/${playing ? 'pause' : 'play'}?device_id=${id()}`, {method:'PUT'}); },
+    nextTrack:() => client.api(`/me/player/next?device_id=${id()}`, {method:'POST'}),
+    previousTrack:() => client.api(`/me/player/previous?device_id=${id()}`, {method:'POST'}),
+    seek:ms => client.api(`/me/player/seek?position_ms=${Math.round(ms)}&device_id=${id()}`, {method:'PUT'}),
+    setVolume:level => client.api(`/me/player/volume?volume_percent=${Math.round(level * 100)}&device_id=${id()}`, {method:'PUT'}),
     getCurrentState, disconnect() {}};
 }
