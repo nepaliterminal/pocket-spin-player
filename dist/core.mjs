@@ -1,4 +1,7 @@
 export const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n) || 0));
+export function setPageCursor(state, page, cursor) {
+  if (state.page === page) state.cursor = cursor;
+}
 export const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 export function readJson(storage, key, fallback) {
   try { return JSON.parse(storage.getItem(key)) ?? fallback; } catch { return fallback; }
