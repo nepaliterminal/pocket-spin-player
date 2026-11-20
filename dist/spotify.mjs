@@ -27,7 +27,7 @@ export class SpotifyClient {
   logout() {
     this.generation++; this.token = null; this.refreshing = null; this.retryAt = 0;
     try { this.storage.removeItem(TOKEN_KEY); } catch { /* Storage may be disabled. */ }
-    this.onLogout();
+    try { this.onLogout(); } catch { /* cleanup must not mask the logout error */ }
   }
   async fetch(url, options = {}) {
     const controller = new AbortController();

@@ -132,6 +132,13 @@ test('explicit logout invokes cleanup once and works with empty storage',()=>{
     assert.equal(client.token,null);
   }
 });
+test('throwing logout cleanup cannot mask a session error or retain tokens',async()=>{
+  const client=clientFor(async()=>response(401),token,()=>{throw new Error('cleanup failed');});
+  await assert.rejects(client.api('/me',{},false),/Your session expired/);
+  assert.equal(client.token,null);
+  assert.equal(client.storage.getItem('pocket-spin-token-v1'),null);
+  assert.doesNotThrow(()=>client.logout());
+});
 test('temporary refresh failures do not clear the session or invoke cleanup',async()=>{
   for(const request of [async()=>response(503),async()=>{throw new TypeError('offline');}]) {
     let cleanups=0;
