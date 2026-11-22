@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import * as core from '../dist/core.mjs';
-import { SpotifyClient } from '../dist/spotify.mjs';
+import { SpotifyClient, remotePlayer } from '../dist/spotify.mjs';
 
 async function loadApp(globals={}) {
   const elements=new Map();
@@ -68,4 +68,54 @@ test('automatic logout clears private app state and ignores pending SDK sync',as
   await pending;
   assert.equal(vm.runInContext('state.track',context),null);
   assert.doesNotMatch(element('#screen').innerHTML,/private-/);
+});
+
+test('initial SDK failure and reconnect show the remote hint when no device is available',async()=>{
+  const source=await readFile(new URL('../dist/app.js',import.meta.url),'utf8');
+  for(const native of [false,true]) {
+    for(const devices of [[],[{id:'remote-device',name:'Spotify Phone',is_active:true}]]) {
+      const elements=new Map();
+      const element=selector=>{
+        if(!elements.has(selector))elements.set(selector,{
+          innerHTML:'',classList:{toggle(){},add(){},remove(){}},setAttribute(){},addEventListener(){},querySelector(){return null;}
+        });
+        return elements.get(selector);
+      };
+      const storage=new Map();
+      const localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)};
+      let sdkAttempts=0,deviceRequests=0;
+      const context=vm.createContext({
+        ...core,esc:core.escapeHtml,localStorage,performance:{now:()=>0},remotePlayer,
+        document:{querySelector:element,addEventListener(){}},
+        window:{addEventListener(){},PocketSpinAndroid:{isApp:()=>native}},
+        setInterval(){},setTimeout(){},clearTimeout(){},installFullscreen(){},
+        loadSdk:async()=>{sdkAttempts++;throw new Error('Spotify’s audio player could not load. Try reconnecting in Setup.');},
+        SpotifyClient:class extends SpotifyClient {
+          constructor(options){super({...options,storage:localStorage,session:localStorage,request:async url=>{
+            assert.equal(url,'https://api.spotify.com/v1/me/player/devices');
+            deviceRequests++;return new Response(JSON.stringify({devices}));
+          }});}
+        }
+      });
+      vm.runInContext(source.replace(/^import .*;\n/gm,'').replace('boot().catch(report);',''),context);
+      vm.runInContext("client.saveToken({access_token:'test-token',expires_in:3600})",context);
+      for(const action of ['connectPlayer','actions.reconnect']) {
+        await vm.runInContext(`run(${action})`,context);
+        if(devices.length) {
+          assert.equal(vm.runInContext('state.deviceId',context),'remote-device');
+          assert.equal(vm.runInContext('state.player.remote',context),true);
+          assert.equal(vm.runInContext('state.playerError',context),'');
+          assert.equal(element('#errorBox').hidden,true);
+        } else {
+          const hint=native?'Open the Spotify app on this phone, then press Play in Pocket Spin.':'Open Spotify on any device, then press Play here.';
+          assert.equal(vm.runInContext('state.playerError',context),hint);
+          assert.equal(element('#statusCopy').textContent,hint);
+          assert.equal(element('#errorText').textContent,hint);
+          assert.equal(element('#errorBox').hidden,false);
+        }
+      }
+      assert.equal(sdkAttempts,2);
+      assert.equal(deviceRequests,2);
+    }
+  }
 });

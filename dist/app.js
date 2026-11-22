@@ -205,7 +205,7 @@ async function connectPlayer() {
     if(epoch!==state.epoch)return;
     const fromSdk=sdkStarted&&!state.player?.remote;
     state.player?.disconnect();state.player=null;state.deviceId=null;
-    if(fromSdk) {sdkFailed=true;if(await connectRemote(epoch).catch(()=>false))return;}
+    if(fromSdk) {sdkFailed=true;if(await connectRemote(epoch).catch(()=>false))return;error=new Error(remoteHint());}
     state.playerError=error.message;updateStatus();throw error;
   }
   finally {if(state.connecting===task)state.connecting=null;}
